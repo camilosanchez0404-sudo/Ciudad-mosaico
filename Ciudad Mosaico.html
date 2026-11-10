@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ciudad Mosaico</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Mundo único (juego): tablero de tinta azul sobre papel claro, acentos de tesela. HUD en las esquinas, diálogo abajo, retos en tarjeta central. */
+  --ink:#1b2a4a; --paper:#f6f9ff; --mango:#ffb703; --coral:#e5484d; --leaf:#0a9b6f; --sky:#118ab2; --mute:#5d6b86;
+  --display:"Baloo 2","Trebuchet MS",system-ui,sans-serif; --body:"Nunito","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#b4b8bf;color:var(--ink);font-family:var(--body);font-weight:600;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+.btn{background:var(--mango);border:3px solid var(--ink);border-radius:14px;padding:10px 20px;font-family:var(--display);font-weight:800;font-size:1.1rem;box-shadow:0 4px 0 var(--ink);transition:transform .08s}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.btn.alt{background:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.box{background:var(--paper);border:3px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 rgba(27,42,74,.85)}
+h1,h2,h3{font-family:var(--display);font-weight:800;margin:0;line-height:1.1;text-wrap:balance}
+
+/* HUD */
+#hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none}
+#hud>*{pointer-events:auto}
+.hud-l,.hud-r{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{background:var(--paper);border:3px solid var(--ink);border-radius:999px;padding:4px 14px;font-weight:800;font-size:.95rem;white-space:nowrap}
+#pips{display:flex;gap:4px;padding:6px 10px}
+#pips i{width:14px;height:14px;border-radius:4px;border:2px solid var(--ink);background:#c9ced8;display:block}
+.hbtn{white-space:nowrap;background:var(--paper);border:3px solid var(--ink);border-radius:12px;padding:5px 12px;font-weight:800;box-shadow:0 3px 0 var(--ink)}
+#goal{position:fixed;top:58px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:var(--ink);color:#fff;border-radius:999px;padding:6px 16px 6px 10px;font-weight:700;font-size:.95rem;max-width:calc(100% - 32px)}
+#goalArrow{flex:none;width:26px;height:26px;border-radius:50%;background:var(--mango);display:grid;place-items:center}
+#goalArrow::before{content:"";border:6px solid transparent;border-bottom:11px solid var(--ink);border-top:0;display:block}
+#mini{position:fixed;right:10px;top:58px;width:120px;height:120px;border:3px solid var(--ink);border-radius:16px;background:var(--paper)}
+#btnAct{position:fixed;right:18px;bottom:22px;font-size:1.15rem;padding:14px 22px;max-width:60vw}
+#stick{position:fixed;left:18px;bottom:22px;width:128px;height:128px;border-radius:50%;background:rgba(246,249,255,.55);border:3px solid var(--ink);touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px;border-radius:50%;background:var(--mango);border:3px solid var(--ink)}
+#keys{position:fixed;left:14px;bottom:14px;background:rgba(27,42,74,.82);color:#fff;border-radius:12px;padding:6px 12px;font-size:.85rem}
+
+/* Diálogo */
+#dialog{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(760px,calc(100% - 24px));padding:26px 20px 14px;cursor:pointer}
+#dlgWho{position:absolute;top:-18px;left:18px;background:var(--mango);border:3px solid var(--ink);border-radius:12px;padding:2px 14px;font-family:var(--display);font-weight:800;font-size:1.05rem}
+#dlgTxt{font-size:clamp(1rem,2.4vw,1.2rem);line-height:1.45;min-height:4.3em;margin:0;white-space:pre-wrap}
+#dlgNext{display:block;margin-left:auto;margin-top:6px;font-size:.95rem;padding:6px 16px}
+
+/* Capas */
+.veil{position:fixed;inset:0;display:grid;place-items:center;padding:12px;background:rgba(27,42,74,.45);overflow:auto}
+.card{width:min(680px,100%);max-height:calc(100% - 8px);overflow:auto;padding:20px}
+.eyebrow{font-size:.82rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:0 0 4px}
+.ctx{background:#fff;border:2px dashed var(--mute);border-radius:12px;padding:10px 14px;margin:10px 0;white-space:pre-wrap;line-height:1.4}
+.q{font-size:clamp(1.1rem,2.6vw,1.35rem);margin:8px 0 12px}
+.opts{display:grid;gap:10px}
+.opt{text-align:left;background:#fff;border:3px solid var(--ink);border-radius:14px;padding:11px 14px;font-weight:700;line-height:1.35;font-size:1rem;display:flex;gap:10px;align-items:flex-start}
+.opt b{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:.85rem}
+.opt:hover:not(:disabled){background:#fff6dc}
+.opt.ok{background:#d6f5e6;border-color:var(--leaf)} .opt.ok b{background:var(--leaf)}
+.opt.no{background:#fde2e2;border-color:var(--coral);opacity:.7} .opt.no b{background:var(--coral)}
+.fb{margin-top:12px;border-radius:12px;padding:10px 14px;line-height:1.4;font-weight:700}
+.fb.hint{background:#fff1c9;border:2px solid var(--mango)}
+.fb.good{background:#d6f5e6;border:2px solid var(--leaf)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end;margin-top:14px}
+.stars{font-size:1.5rem;letter-spacing:4px;color:var(--mango);-webkit-text-stroke:1.5px var(--ink);margin-right:auto}
+.slots{display:grid;gap:8px;margin-bottom:12px}
+.slot{border:3px dashed var(--mute);border-radius:12px;padding:9px 12px;min-height:46px;display:flex;gap:10px;align-items:center;font-weight:700;color:var(--mute)}
+.slot.full{border-style:solid;border-color:var(--ink);background:#fff;color:var(--ink)}
+.item{background:#fff;border:3px solid var(--ink);border-radius:14px;padding:16px;font-size:1.12rem;font-weight:800;text-align:center;margin:8px 0 12px;line-height:1.35}
+.cats{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.cats .opt{justify-content:center;text-align:center}
+.prog{height:10px;border-radius:99px;background:#dfe5f1;overflow:hidden;border:2px solid var(--ink)}
+.prog i{display:block;height:100%;background:var(--leaf);width:0;transition:width .25s}
+.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* Título y creador */
+#vTitle{background:linear-gradient(rgba(27,42,74,.05),rgba(27,42,74,.5))}
+#vTitle .card{text-align:center;width:min(520px,100%)}
+#vTitle h1{font-size:clamp(2.4rem,9vw,3.8rem)}
+#vTitle h1 span{color:var(--coral)}
+#vTitle p{margin:8px auto 16px;max-width:38ch;line-height:1.45}
+.tiles{display:flex;justify-content:center;gap:6px;margin:0 0 10px}
+.tiles i{width:22px;height:22px;border:3px solid var(--ink);border-radius:6px;display:block}
+.col{display:grid;gap:10px;justify-items:center}
+#creator{position:fixed;right:16px;top:50%;transform:translateY(-50%);width:min(360px,calc(100% - 32px));padding:18px;max-height:calc(100% - 24px);overflow:auto}
+#creator label,.lab{display:block;font-weight:800;font-size:.9rem;margin:12px 0 5px}
+#inName{width:100%;font:inherit;font-weight:800;font-size:1.1rem;padding:9px 12px;border:3px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);-webkit-user-select:text;user-select:text}
+.sw{display:flex;gap:7px;flex-wrap:wrap}
+.sw button{width:34px;height:34px;border-radius:50%;border:3px solid var(--ink);padding:0}
+.sw button.txt{width:auto;border-radius:10px;padding:0 11px;background:#fff;font-weight:800;font-size:.9rem}
+.sw button[aria-pressed="true"]{outline:4px solid var(--mango);outline-offset:1px}
+#crMsg{color:var(--coral);font-weight:800;min-height:1.3em;margin:8px 0 0}
+@media (max-width:720px){
+  #creator{right:50%;transform:translateX(50%);top:auto;bottom:10px;max-height:56%}
+  #hud{top:8px;left:8px;right:8px;gap:6px}
+  .hud-l,.hud-r{gap:5px} .hud-r{flex-wrap:nowrap}
+  .chip,.hbtn{font-size:.78rem;padding:3px 9px;border-width:2px} #pips{padding:5px 7px;gap:3px} #pips i{width:10px;height:10px;border-width:1.5px}
+  #chipName{max-width:104px;overflow:hidden;text-overflow:ellipsis}
+  #mini{width:88px;height:88px;top:78px;right:8px}
+  #goal{top:auto;bottom:168px;font-size:.85rem;border-radius:16px;width:max-content}
+  #toast{top:176px}
+}
+@media (pointer:fine){ #stick{display:none} }
+@media (pointer:coarse){ #keys{display:none} }
+
+/* Letrero de localización */
+#locBand{position:fixed;left:0;right:0;bottom:25%;pointer-events:none;text-align:center;padding:12px 0;opacity:0;transition:opacity .45s;
+ background:linear-gradient(100deg,rgba(64,48,110,0) 3%,rgba(64,48,110,.5) 24%,rgba(23,42,84,.6) 50%,rgba(64,48,110,.5) 76%,rgba(64,48,110,0) 97%)}
+#locBand::before,#locBand::after{content:"";position:absolute;left:5%;right:5%;height:2.5px;background:linear-gradient(90deg,transparent,#fff 16%,#fff 84%,transparent)}
+#locBand::before{top:0} #locBand::after{bottom:0}
+#locBand span{font-family:var(--display);font-weight:800;font-size:clamp(1.25rem,4vw,1.9rem);color:#fff;text-shadow:0 2px 8px rgba(20,25,60,.6);letter-spacing:.02em}
+#locBand.show{opacity:1}
+
+/* Cuaderno, juramento, diploma */
+.dsec{border-top:2px solid #d5dcea;padding:12px 0}
+.dsec h3{font-size:1.1rem;display:flex;gap:8px;align-items:center}
+.dsec h3 i{width:14px;height:14px;border-radius:4px;border:2px solid var(--ink);display:block;flex:none}
+.dsec dl{margin:8px 0 0}
+.dsec dt{font-weight:800} .dsec dd{margin:0 0 8px;line-height:1.4}
+.dim{color:var(--mute)}
+#oathTxt{width:100%;min-height:150px;font:inherit;padding:12px;border:3px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);line-height:1.45;resize:vertical;-webkit-user-select:text;user-select:text}
+.chk{list-style:none;padding:0;margin:10px 0;display:grid;gap:5px}
+.chk li{display:flex;gap:8px;align-items:center;font-weight:700}
+.chk li::before{content:"○";font-weight:800;color:var(--mute)}
+.chk li.y::before{content:"✓";color:var(--leaf)}
+#vCert .card{text-align:center;border-width:5px;background:linear-gradient(#fffdf5,#f6f9ff)}
+#certName{font-size:clamp(1.8rem,6vw,2.6rem);color:var(--sky);margin:6px 0}
+#certOath{text-align:left;background:#fff;border:2px solid #d5dcea;border-radius:12px;padding:12px;white-space:pre-wrap;line-height:1.45;font-style:italic;margin:12px 0;-webkit-user-select:text;user-select:text}
+#toast{position:fixed;left:50%;top:104px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 18px;border-radius:999px;font-weight:800;max-width:calc(100% - 32px);text-align:center}
+#banner{position:fixed;left:50%;top:22%;transform:translateX(-50%);text-align:center;padding:16px 28px;width:max-content;max-width:calc(100% - 32px);animation:pop .4s}
+#banner h2{font-size:clamp(1.5rem,5vw,2.2rem)}
+@keyframes pop{from{transform:translateX(-50%) scale(.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="hud" hidden>
+  <div class="hud-l"><span class="chip" id="chipName"></span><span class="chip" id="chipStars">★ 0</span><span class="chip" id="pips" aria-label="Teselas recuperadas"></span></div>
+  <div class="hud-r"><button class="hbtn" id="btnBook">Cuaderno</button><button class="hbtn" id="btnSnd">Con sonido</button></div>
+</div>
+<div id="goal" hidden><span id="goalArrow"></span><span id="goalTxt"></span></div>
+<canvas id="mini" width="240" height="240" hidden></canvas>
+<div id="keys" hidden>Muévete con las flechas o W A S D · Habla con E o Espacio</div>
+<div id="stick" hidden><div id="knob"></div></div>
+<button class="btn" id="btnAct" hidden></button>
+<div id="toast" hidden></div>
+<div id="banner" class="box" hidden><p class="eyebrow">Tesela recuperada</p><h2 id="banTxt"></h2></div>
+<div id="locBand" aria-hidden="true"><span id="locTxt"></span></div>
+
+<div id="dialog" class="box" hidden>
+  <span id="dlgWho"></span>
+  <p id="dlgTxt"></p>
+  <button class="btn" id="dlgNext">Siguiente</button>
+</div>
+
+<div class="veil" id="vTitle">
+  <div class="card box">
+    <div class="tiles" aria-hidden="true"><i style="background:#ef476f"></i><i style="background:#f77f00"></i><i style="background:#06a77d"></i><i style="background:#118ab2"></i><i style="background:#ffb703"></i><i style="background:#7b5cd6"></i></div>
+    <h1>Ciudad <span>Mosaico</span></h1>
+    <p>La Niebla Gris apagó los colores de Villa Mosaico. Recorre sus seis barrios, ayuda a sus habitantes y recupera las teselas perdidas.</p>
+    <div class="col">
+      <button class="btn" id="btnStart">Empezar aventura</button>
+      <button class="btn alt" id="btnReset" hidden>Empezar de nuevo</button>
+    </div>
+    <p class="dim" style="margin-bottom:0;font-size:.85rem">Ciencias Sociales · Grado quinto · Gimnasio Domingo Savio</p>
+  </div>
+</div>
+<div id="nogl" class="veil" hidden><div class="card box"><h2>Este dispositivo no puede mostrar el juego en 3D</h2><p>Abre el enlace en un navegador actualizado (Chrome, Edge o Safari) y activa la aceleración gráfica.</p></div></div>
+
+<div id="creator" class="box" hidden>
+  <h2>Crea tu personaje</h2>
+  <label for="inName">¿Cómo te llamas?</label>
+  <input id="inName" maxlength="14" autocomplete="off" placeholder="Tu nombre">
+  <span class="lab">Tu título</span><div class="sw" id="swG"></div>
+  <span class="lab">Piel</span><div class="sw" id="swSkin"></div>
+  <span class="lab">Cabello</span><div class="sw" id="swHair"></div>
+  <span class="lab">Peinado</span><div class="sw" id="swStyle"></div>
+  <span class="lab">Camiseta</span><div class="sw" id="swShirt"></div>
+  <p id="crMsg"></p>
+  <button class="btn" id="btnGo" style="width:100%">¡Entrar a la ciudad!</button>
+</div>
+
+<div class="veil" id="vCh" hidden><div class="card box" id="chCard"></div></div>
+
+<div class="veil" id="vBook" hidden><div class="card box">
+  <p class="eyebrow">Lo que has aprendido</p><h2>Cuaderno de {g}</h2>
+  <div id="bookBody"></div>
+  <div class="row"><button class="btn" id="bookClose">Cerrar</button></div>
+</div></div>
+
+<div class="veil" id="vOath" hidden><div class="card box">
+  <p class="eyebrow">Reto final · Doña Ceiba</p><h2>Tu juramento</h2>
+  <p class="q" style="font-family:var(--body);font-weight:700;font-size:1.05rem">Explica con tus propias palabras la diferencia entre estereotipo, prejuicio y discriminación. Luego cuenta un ejemplo que muestre cómo se conectan los tres.</p>
+  <textarea id="oathTxt" placeholder="Escribe aquí…"></textarea>
+  <ul class="chk" id="oathChk">
+    <li data-k="estereotip">Explicas qué es un estereotipo</li>
+    <li data-k="prejuici">Explicas qué es un prejuicio</li>
+    <li data-k="discrimin">Explicas qué es la discriminación</li>
+    <li data-k="ejemplo">Incluyes un ejemplo</li>
+    <li data-k="len">Escribes al menos cuatro renglones</li>
+  </ul>
+  <div class="row"><button class="btn alt" id="oathBack">Volver</button><button class="btn" id="oathOk" disabled>Sellar el Mosaico</button></div>
+</div></div>
+
+<div class="veil" id="vCert" hidden><div class="card box">
+  <div class="tiles" aria-hidden="true"><i style="background:#ef476f"></i><i style="background:#f77f00"></i><i style="background:#06a77d"></i><i style="background:#118ab2"></i><i style="background:#ffb703"></i><i style="background:#7b5cd6"></i></div>
+  <p class="eyebrow">Villa Mosaico reconoce a</p>
+  <h2 id="certName"></h2>
+  <h3 id="certRank"></h3>
+  <p id="certStats" style="font-weight:800"></p>
+  <p class="eyebrow" style="text-align:left;margin-top:14px">Su juramento</p>
+  <div id="certOath"></div>
+  <p class="dim" id="certDate" style="font-size:.9rem"></p>
+  <div class="row" style="justify-content:center"><button class="btn" id="certClose">Seguir explorando</button></div>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ====== DATOS DEL JUEGO: barrios, personajes, lecciones y retos ====== */
+const DISTRICTS = [
+  {id:'espejos', name:'Barrio de los Espejos', tema:'Estereotipo, prejuicio y discriminación', cx:-62, cz:-36, tint:'#ef476f'},
+  {id:'feria',   name:'Plaza de la Feria',     tema:'Patrimonio cultural',                    cx:0,   cz:-72, tint:'#f77f00'},
+  {id:'cano',    name:'Vereda Aguas Vivas',    tema:'Contaminación y recursos naturales',     cx:62,  cz:-36, tint:'#06a77d'},
+  {id:'memoria', name:'Estación de la Memoria',tema:'La Masacre de las Bananeras (1928)',     cx:62,  cz:36,  tint:'#118ab2'},
+  {id:'avenida', name:'Avenida del Colegio',   tema:'Seguridad vial y normas de tránsito',    cx:0,   cz:72,  tint:'#ffb703'},
+  {id:'parque',  name:'Parque de las Voces',   tema:'Competencias ciudadanas',                cx:-62, cz:36,  tint:'#7b5cd6'}
+];
+
+/* Construcciones y obstáculos fijos (cajas w×d o círculos r). El motor dibuja sobre estas mismas coordenadas. */
+const B = {
+  mosaic:{x:0,z:-7.5,w:8,d:2}, ceiba:{x:-10,z:-2,r:1.6}, lampA:{x:-8,z:8,r:.3}, lampB:{x:8,z:8,r:.3},
+  school:{x:-62,z:-53,w:18,d:7}, mir1:{x:-79,z:-44,r:1.2}, mir2:{x:-49,z:-49,r:1.2}, mir3:{x:-80,z:-24,r:1.2},
+  stage:{x:0,z:-88,w:14,d:6}, tent1:{x:-13,z:-79,r:2.4}, tent2:{x:13,z:-79,r:2.4}, tent3:{x:-15,z:-64,r:2.4},
+  river:{x:79,z:-38,w:6,d:70}, forest:{x:92,z:-38,w:14,d:70}, shed:{x:55,z:-55,w:8,d:6}, barrels:{x:61.5,z:-56,r:1},
+  station:{x:73,z:21,w:14,d:7}, loco:{x:74,z:49,w:9,d:3}, ban1:{x:86,z:30,r:1}, ban2:{x:88,z:38,r:1}, ban3:{x:84,z:42,r:1},
+  school2:{x:-19,z:61,w:12,d:6}, shelter:{x:19,z:71.6,w:5,d:1.6}, sgn1:{x:-5,z:73.3,r:.3}, sgn2:{x:5,z:73.3,r:.3}, sgn3:{x:13,z:73.3,r:.3}, stand:{x:13.5,z:64,w:3,d:2},
+  fountain:{x:-62,z:36,r:3}, kiosk:{x:-75,z:23,r:3.6}, bench1:{x:-56,z:30,w:2.4,d:.8}, bench2:{x:-66,z:41,w:2.4,d:.8}, swing:{x:-49,z:49,w:3.4,d:1.2}
+};
+
+const SK = ['#f6d3b3','#e8b98f','#c98e62','#9b6642','#6b4329'];
+const HR = ['#1b1b1f','#4a2c17','#8a5a2b','#d9a441','#b5372c','#b9b9c2'];
+
+const CEIBA = {id:'ceiba', name:'Doña Ceiba', x:4, z:-2, look:{skin:SK[3],hair:HR[5],shirt:'#2a9d8f',pants:'#5a3d2b',style:1,acc:'none'}};
+
+const INTRO = [
+  '¡Por fin llegas, {n}! Soy Doña Ceiba, la cuidadora del Gran Mosaico. Te estaba esperando.',
+  'Villa Mosaico era la ciudad más colorida del Llano. La hicimos entre todos, como un mosaico: miles de piezas distintas que juntas forman algo hermoso.',
+  'Pero anoche llegó la Niebla Gris. Aparece cuando la gente deja de cuidar a los demás, su cultura, su río, su historia, sus calles y sus decisiones.',
+  'La niebla apagó los colores y arrancó las seis teselas del Gran Mosaico. Cada una cayó en un barrio distinto.',
+  'Tú vas a recuperarlas. En cada barrio hay un problema: habla con la gente, aprende qué está pasando y ayúdales a resolverlo.',
+  {s:'Chigüi', t:'¡Cuic, cuic! (Chigüi, el chigüiro más curioso de Villavicencio, decide acompañarte.)'},
+  'Sigue la flecha amarilla de arriba. Empieza por el Barrio de los Espejos. ¡Confío en ti, {g} del Mosaico!'
+];
+
+const NPCS = [
+/* ================= 1. BARRIO DE LOS ESPEJOS ================= */
+{id:'lucia', d:'espejos', role:'guide', name:'Profe Lucía', x:-50, z:-29, look:{skin:SK[1],hair:HR[1],shirt:'#ef476f',style:1,acc:'glasses'},
+ lesson:[
+  '¡Hola, {n}! Qué bueno que llegas. Desde que cayó la niebla, los espejos del barrio muestran a la gente torcida. Ya nadie ve a los demás como realmente son.',
+  'Te explico. Todo empieza con un ESTEREOTIPO: una idea generalizada sobre todo un grupo. Por ejemplo: «todos los de esa región son iguales». Es como mirar por un lente torcido.',
+  'Después llega el PREJUICIO, que es una emoción. Sientes rechazo o desconfianza hacia alguien antes de conocerlo, solo por esa idea.',
+  'Al final aparece la DISCRIMINACIÓN, que es una acción. Excluyes, te burlas o tratas mal a la persona. Ahí ya se vulneran sus derechos.',
+  'Recuérdalo así: primero se PIENSA (estereotipo), luego se SIENTE (prejuicio) y por último se ACTÚA (discriminación).',
+  'Mis estudiantes y vecinos necesitan tu ayuda. Busca a quienes tienen el signo amarillo sobre la cabeza.'],
+ notes:[
+  ['Estereotipo','Idea o imagen mental generalizada que pretende definir a todo un grupo. Es un pensamiento.'],
+  ['Prejuicio','Emoción o juicio negativo hacia alguien antes de conocerlo.'],
+  ['Discriminación','Acción: excluir o tratar mal a alguien. Vulnera sus derechos.'],
+  ['La cadena','Pensar (estereotipo) → sentir (prejuicio) → actuar (discriminación).']]},
+{id:'mateo', d:'espejos', name:'Mateo', x:-55, z:-41, look:{skin:SK[2],hair:HR[0],shirt:'#118ab2',style:0,kid:1},
+ intro:['Estoy armando un cartel para explicar cómo nace la discriminación, pero se me desordenaron las piezas. ¿Me ayudas a ponerlas en orden?'],
+ ch:{type:'order', q:'Toca los tres eslabones en el orden en que ocurren.',
+  items:['Estereotipo: lo que se piensa','Prejuicio: lo que se siente','Discriminación: lo que se hace'],
+  hint:'Sigue este camino: la mente, luego las emociones y por último las acciones.',
+  why:'La discriminación no surge de la nada. Primero hay una idea (estereotipo), esa idea despierta una emoción (prejuicio) y la emoción lleva a una acción (discriminación).'},
+ after:'¡Quedó perfecto el cartel! Lo voy a pegar en la entrada del colegio.'},
+{id:'valeria', d:'espejos', name:'Valeria', x:-64, z:-43, look:{skin:SK[0],hair:HR[2],shirt:'#ffb703',style:2,kid:1},
+ intro:['Ayer llegó Dayana, una niña nueva que viene de otra región del país. Mi compañero Samuel había oído muchos chismes sobre la gente de allá.'],
+ ch:{type:'quiz', ctx:'Samuel todavía no ha hablado con Dayana ni le ha hecho nada malo. Pero cuando ella se sienta cerca, él siente desconfianza y ganas de alejarse.',
+  q:'¿En qué eslabón de la cadena está Samuel?',
+  opts:['En el prejuicio, porque ya siente rechazo hacia Dayana sin conocerla.','En el estereotipo únicamente, porque solo recuerda una idea y no siente nada.','En la discriminación, porque ya la sacó del salón.','En ninguno, porque no ha dicho nada en voz alta.'],
+  hint:'Fíjate en la palabra clave: Samuel SIENTE desconfianza, pero todavía no ha HECHO nada.',
+  why:'El prejuicio es la fase emocional: una valoración negativa hacia alguien antes de conocerlo. Sería discriminación si Samuel la excluyera o la tratara mal.',
+  note:['Cómo reconocer el prejuicio','Hay rechazo o desconfianza, pero todavía no hay una acción contra la persona.']},
+ after:'Voy a contarle a Samuel. Seguro que si habla con Dayana se le pasa la desconfianza.'},
+{id:'samuel', d:'espejos', name:'Samuel', x:-73, z:-38, look:{skin:SK[3],hair:HR[0],shirt:'#06a77d',style:4,kid:1},
+ intro:['Ya entendí que me equivoqué con Dayana. Ni siquiera la conocía. Ahora quiero aprender a reconocer cada eslabón. ¿Practicamos juntos?'],
+ ch:{type:'classify', q:'¿A qué eslabón pertenece cada situación?', cats:['Estereotipo (idea)','Prejuicio (emoción)','Discriminación (acción)'],
+  items:[['«Todos los que usan gafas son nerdos.»',0],['«Ese niño nuevo me cae mal y ni siquiera lo conozco.»',1],['No dejar jugar a Ana en el equipo porque viene de otro país.',2],['«La gente del campo no sabe usar tecnología.»',0],['Sentir miedo de un vecino solo por el barrio donde vive.',1],['Burlarse de una compañera frente a todos por su forma de hablar.',2]],
+  why:'Si es una idea general sobre un grupo, es estereotipo. Si es una emoción hacia alguien sin conocerlo, es prejuicio. Si es un trato injusto, es discriminación.'},
+ after:'¡Gracias! Hoy mismo voy a invitar a Dayana a jugar en el descanso.'},
+{id:'wilmer', d:'espejos', name:'Don Wilmer', x:-72, z:-28, look:{skin:SK[2],hair:HR[0],shirt:'#f77f00',style:0,acc:'apron'},
+ intro:['Soy Wilmer. Llegué de Venezuela hace tres años y vendo arepas en esta esquina. La discriminación tiene varias caras y conviene saber distinguirlas.',
+  'XENOFOBIA es el rechazo o temor al extranjero. RACISMO es discriminar por rasgos físicos, como el color de la piel. DISCRIMINACIÓN ECONÓMICA es tratar mal a alguien por ser pobre.'],
+ ch:{type:'classify', q:'¿Qué tipo de discriminación ocurre en cada caso?', cats:['Xenofobia','Racismo','Discriminación económica'],
+  items:[['A una familia no le arriendan una casa solo porque viene de otro país.',0],['En una tienda, el vigilante persigue a un joven de un barrio humilde porque cree que va a robar.',2],['A un niño no lo dejan entrar a una fiesta por su color de piel.',1],['«Los extranjeros vienen a quitarnos el trabajo», dice un señor, y se niega a atenderlos.',0],['Tratan como sospechosos a todos los habitantes de un sector pobre.',2]],
+  why:'La xenofobia se dirige al extranjero. El racismo usa rasgos físicos o biológicos para justificar la discriminación. Tratar a quienes viven en sectores empobrecidos como si fueran delincuentes es discriminación económica: se llama criminalización de la pobreza.',
+  note:['Tipos de discriminación','Xenofobia: rechazo al extranjero. Racismo: por rasgos físicos. Económica: criminalización de la pobreza, tratar a los pobres como delincuentes.']},
+ after:'Así es. Y mira: mis arepas le gustan a todo el mundo, venga de donde venga.'},
+{id:'yaneth', d:'espejos', name:'Yaneth', x:-63, z:-24, look:{skin:SK[3],hair:HR[0],shirt:'#7b5cd6',style:1,kid:1},
+ intro:['Soy Yaneth, del pueblo Sikuani. En mi comunidad falta agua potable y el puesto de salud queda lejísimos.','Y cuando vengo a la ciudad, algunas personas se burlan de mi lengua y de mis costumbres.'],
+ ch:{type:'quiz', q:'A lo que viven muchos pueblos indígenas se le llama «la doble injusticia». ¿Por qué?',
+  opts:['Porque sufren al mismo tiempo dos injusticias que se cruzan: la socioeconómica y la cultural.','Porque los discriminan en su territorio y también cuando viajan a otros países.','Porque la justicia los castiga dos veces por el mismo reclamo.','Porque los discriminan por su edad y por su estatura.'],
+  hint:'Yaneth te contó dos problemas distintos. Uno tiene que ver con recursos y servicios. El otro, con su lengua y sus costumbres.',
+  why:'Es doble porque se juntan la injusticia socioeconómica (pobreza y falta de servicios) y la injusticia cultural (desprecio por su lengua, sus costumbres y su identidad).',
+  note:['La doble injusticia','Los pueblos indígenas suelen sufrir a la vez injusticia socioeconómica e injusticia cultural.']},
+ after:'Gracias por escucharme. Ojalá más gente quisiera conocer nuestra cultura antes de juzgarla.'},
+{id:'carmen', d:'espejos', name:'Rectora Carmen', x:-62, z:-34, look:{skin:SK[0],hair:HR[5],shirt:'#3d5a80',style:0,acc:'glasses'},
+ intro:['Soy la rectora. Para acabar con las burlas se me ocurrió una regla: que todos hablen igual, se vistan igual y nadie mencione de dónde viene ni qué costumbres tiene su familia.','¡Así todos seremos idénticos y nadie se burlará de nadie! ¿Qué opinas?'],
+ ch:{type:'quiz', q:'¿Por qué la regla de la rectora NO resuelve la discriminación?',
+  opts:['Porque la solución es el reconocimiento: aceptar al otro y respetar sus diferencias, no borrarlas.','Porque lo mejor sería poner a los estudiantes de otras regiones en un salón aparte.','Porque los prejuicios nunca cambian, así que no vale la pena hacer nada.','Porque basta con prohibir que se hable del tema en el colegio.'],
+  hint:'Si para que no se burlen de ti tienes que esconder quién eres, ¿de verdad te están respetando?',
+  why:'Obligar a todos a ser idénticos es un falso antídoto. El verdadero antídoto es el reconocimiento: aceptar al otro tal como es y valorar lo que nos hace distintos.',
+  note:['Reconocimiento','El antídoto contra la discriminación: aceptar al otro respetando sus diferencias, sin obligarlo a ocultarlas.']},
+ after:'Tienes toda la razón. Cambiaré la regla: mejor haremos una Semana de las Culturas.'},
+
+/* ================= 2. PLAZA DE LA FERIA ================= */
+{id:'eusebio', d:'feria', role:'guide', name:'Don Eusebio', x:3, z:-59, look:{skin:SK[2],hair:HR[5],shirt:'#f4f1de',style:0,acc:'hat'},
+ lesson:[
+  '¡Epa, {n}! Soy Eusebio, arpista de esta feria. Mira qué tristeza: llegó la niebla y ahora la gente dice que el joropo «es cosa del pasado».',
+  'Lo que heredamos de quienes vivieron antes se llama PATRIMONIO CULTURAL. Hace parte de nuestra identidad y por eso hay que cuidarlo.',
+  'El patrimonio MATERIAL se puede tocar: monumentos, iglesias antiguas, objetos arqueológicos.',
+  'El patrimonio INMATERIAL vive en la gente: músicas, bailes, relatos, fiestas, recetas y saberes que pasan de generación en generación.',
+  'Si nadie lo practica ni lo enseña, se pierde. Ayuda a mis amigos y la feria volverá a sonar.'],
+ notes:[
+  ['Patrimonio cultural','Herencia de un pueblo que forma parte de su identidad.'],
+  ['Patrimonio material','Bienes físicos: monumentos, iglesias coloniales, objetos arqueológicos.'],
+  ['Patrimonio inmaterial','Tradiciones, saberes y expresiones vivas que se transmiten de generación en generación: joropo, cantos, recetas.']]},
+{id:'isabela', d:'feria', name:'Isabela', x:-8, z:-68, look:{skin:SK[1],hair:HR[1],shirt:'#ef476f',style:2,kid:1},
+ intro:['Estoy organizando la exposición de quinto y no sé en qué mesa va cada cosa. ¿Me ayudas a separarlas?'],
+ ch:{type:'classify', q:'¿En qué mesa va cada elemento?', cats:['Patrimonio material','Patrimonio inmaterial'],
+  items:[['El baile del joropo',1],['Una iglesia colonial de hace 300 años',0],['La receta de la mamona que enseña la abuela',1],['Una vasija arqueológica del museo',0],['Las coplas y el contrapunteo llanero',1],['El monumento de una plaza',0]],
+  why:'Lo material son bienes físicos: edificios, monumentos y objetos. Lo inmaterial son tradiciones, saberes y expresiones vivas que pasan de generación en generación.'},
+ after:'¡Listo! La exposición quedó ordenada. Ven a verla cuando abramos.'},
+{id:'ramiro', d:'feria', name:'Abuelo Ramiro', x:0, z:-78, look:{skin:SK[3],hair:HR[5],shirt:'#8d6e63',style:0,acc:'hat'},
+ intro:['De joven fui cabestrero. Con mis cantos guiaba el ganado por la sabana. Hoy mis nietos dicen que eso ya no sirve para nada.'],
+ ch:{type:'quiz', q:'¿Qué le pasaría a un país si sus comunidades olvidaran sus fiestas, su comida y su música tradicional?',
+  opts:['Se debilitarían la identidad cultural y la memoria histórica que unen a su gente.','Tendría más industrias, porque las tradiciones frenan el progreso.','Los monumentos de las plazas desaparecerían de inmediato.','Todas las regiones pasarían a tener el mismo clima y los mismos recursos.'],
+  hint:'Las tradiciones no cambian el clima ni tumban monumentos. Piensa en lo que nos hace sentir parte de un mismo pueblo.',
+  why:'Las tradiciones guardan la memoria de un pueblo. Si se olvidan, se debilita la identidad cultural: eso que nos permite reconocernos y sentirnos unidos.',
+  note:['Si se olvida el patrimonio','Se debilitan la identidad cultural y la memoria histórica.']},
+ after:'Entonces mis cantos sí valen. Mañana mismo se los enseño a mis nietos.'},
+{id:'chepa', d:'feria', name:'Doña Chepa', x:9, z:-69, look:{skin:SK[2],hair:HR[0],shirt:'#06a77d',style:1,acc:'apron'},
+ intro:['El colegio quiere proteger el patrimonio del Meta y llegaron cuatro propuestas. Yo solo sé de hayacas y pan de arroz. ¡Ayúdame a escoger la mejor!'],
+ ch:{type:'quiz', q:'¿Cuál propuesta protege mejor el patrimonio cultural de la región?',
+  opts:['Invitar a abuelos y artistas llaneros a enseñar sus relatos, bailes y recetas a los niños.','Prohibir a los estudiantes escuchar música moderna.','Guardar el arpa, el cuatro y las maracas bajo llave para que nadie los dañe.','Estudiar solo las costumbres de otros países.'],
+  hint:'El patrimonio inmaterial vive cuando se practica y se enseña. ¿Cuál propuesta logra que pase de una generación a otra?',
+  why:'El patrimonio se protege usándolo y compartiéndolo. Prohibir lo nuevo o encerrar los instrumentos no sirve: una tradición que nadie practica desaparece.',
+  note:['Cómo se protege','Creando espacios donde los mayores y los artistas compartan sus saberes con los niños.']},
+ after:'¡Esa es! Yo me apunto a enseñar a hacer pan de arroz.'},
+
+/* ================= 3. VEREDA AGUAS VIVAS ================= */
+{id:'rosalba', d:'cano', role:'guide', name:'Doña Rosalba', x:50, z:-29, look:{skin:SK[2],hair:HR[1],shirt:'#06a77d',style:1,acc:'hat'},
+ lesson:[
+  '¡{n}, llegaste! Soy Rosalba, líder ambiental de la vereda. El caño Aguas Vivas era transparente y ahora mira cómo está.',
+  'Hay CONTAMINACIÓN cuando echamos al ambiente cosas que lo dañan. Puede ser del AGUA, del SUELO o del AIRE.',
+  'Además, una empresa encontró petróleo y carbón río arriba. Quiere talar todo el bosque para sacarlos rápido.',
+  'Pon atención: los recursos RENOVABLES se regeneran, como el agua, los bosques, el sol y el viento. Los NO RENOVABLES se acaban, como el petróleo y el carbón, que tardan millones de años en formarse.',
+  'Y cuidado: un recurso renovable también puede agotarse si lo destruimos más rápido de lo que se recupera.',
+  'Nosotros proponemos las tres erres (REDUCIR, REUTILIZAR y RECICLAR) y un DESARROLLO SOSTENIBLE: usar hoy los recursos sin dejar sin nada a quienes vienen después.'],
+ notes:[
+  ['Contaminación','Puede ser del agua (aceites, detergentes), del suelo (basura, plásticos) o del aire (humo, gases).'],
+  ['Recursos renovables','Se regeneran: agua, bosques, sol, viento. Pueden agotarse si se destruyen más rápido de lo que se recuperan.'],
+  ['Recursos no renovables','Se acaban: petróleo, carbón, gas natural.'],
+  ['Las tres erres','Reducir el consumo, reutilizar lo que ya tienes y reciclar los materiales.'],
+  ['Desarrollo sostenible','Satisfacer las necesidades de hoy sin dejar sin recursos a las próximas generaciones.']]},
+{id:'chucho', d:'cano', name:'Chucho, el pescador', x:71, z:-44, look:{skin:SK[3],hair:HR[0],shirt:'#118ab2',style:0,acc:'hat'},
+ intro:['Ya casi no pican los peces. Yo veo mugre por todas partes, pero no toda la contaminación es igual. Miremos qué está dañando cada cosa.'],
+ ch:{type:'classify', q:'¿Qué contamina cada una de estas cosas?', cats:['El agua','El suelo','El aire'],
+  items:[['Aceite de motor que cae al caño',0],['Humo negro de una quema de llantas',2],['Botellas y bolsas plásticas botadas en la orilla',1],['Detergente que baja por el desagüe hasta el río',0],['Pilas viejas enterradas en un potrero',1],['Gases del tubo de escape de un camión',2]],
+  why:'Los líquidos que llegan al caño contaminan el agua. La basura y los plásticos contaminan el suelo. El humo y los gases contaminan el aire.'},
+ after:'Ahora sí entiendo por qué se fueron los peces. Hay que frenar las tres cosas.'},
+{id:'fabio', d:'cano', name:'Fabio, el mecánico', x:64, z:-48, look:{skin:SK[1],hair:HR[1],shirt:'#3d5a80',style:4},
+ intro:['Lo confieso: el aceite del caño salió de mi taller. Voy a cambiar eso.','Pero explícame algo. Trabajo todo el día con gasolina, que sale del petróleo. ¿Eso se acaba o no?'],
+ ch:{type:'classify', q:'¿Cada recurso es renovable o no renovable?', cats:['Renovable','No renovable'],
+  items:[['Petróleo',1],['Luz del sol',0],['Carbón',1],['Viento',0],['Los árboles de un bosque',0],['Gas natural',1],['Agua de lluvia',0]],
+  why:'El petróleo, el carbón y el gas natural son no renovables: tardan millones de años en formarse y, si se gastan, no vuelven. El sol, el viento, el agua y los bosques son renovables.'},
+ after:'Listo. Desde hoy guardo el aceite usado en canecas y lo entrego para que lo traten bien.'},
+{id:'tomas', d:'cano', name:'Tomás', x:70, z:-30, look:{skin:SK[2],hair:HR[2],shirt:'#ffb703',style:0,kid:1},
+ intro:['Mi tío dice que no pasa nada si talan el bosque y ensucian el caño, porque «la naturaleza se arregla sola». Yo no estoy tan seguro.'],
+ ch:{type:'quiz', q:'¿Qué pasaría si se permite contaminar el caño y talar todo el bosque sin control?',
+  opts:['Se afectarían la salud de la gente y los animales, y recursos renovables como el agua y el bosque podrían agotarse.','El caño se limpiaría en pocos días, porque el aceite alimenta a los peces.','El carbón y el petróleo volverían a formarse en unos cinco años.','La vereda tendría agua más pura, porque ya no habría árboles junto al nacimiento.'],
+  hint:'Recuerda lo que dijo Doña Rosalba: un recurso renovable se agota si lo destruimos más rápido de lo que se recupera.',
+  why:'Los bosques protegen los nacimientos de agua. Si se destruyen más rápido de lo que se regeneran, hasta los recursos renovables se agotan. Y la contaminación enferma a personas y animales.'},
+ after:'Lo sabía. Le voy a explicar a mi tío que la naturaleza necesita tiempo y cuidado.'},
+{id:'lina', d:'cano', name:'Lina, la recicladora', x:58, z:-38, look:{skin:SK[3],hair:HR[0],shirt:'#f77f00',style:2,acc:'vest'},
+ intro:['Soy Lina, recicladora de oficio. Las familias quieren limpiar la orilla con las tres erres, pero andan circulando unas ideas muy raras.'],
+ ch:{type:'quiz', q:'¿Cuál plan aplica bien las tres erres?',
+  opts:['Comprar menos plásticos, volver a usar los envases en casa y separar los residuos que se pueden reciclar.','Recoger todo el plástico de la orilla y quemarlo los fines de semana.','Enterrar los envases y el aceite usado en un hueco bien hondo.','Llevar toda la basura del caño a un río del municipio vecino.'],
+  hint:'Quemar, enterrar o mover la basura solo cambia el problema de lugar. Busca la opción que reduce, reutiliza y recicla.',
+  why:'Reducir es consumir menos. Reutilizar es darle otro uso a lo que ya tienes. Reciclar es separar los materiales para convertirlos en algo nuevo. Quemar o enterrar la basura contamina el aire y el suelo.'},
+ after:'¡Eso! Yo paso los jueves por el material separado. Avísales a los vecinos.'},
+{id:'marcela', d:'cano', name:'Ingeniera Marcela', x:60, z:-22, look:{skin:SK[0],hair:HR[2],shirt:'#e9c46a',style:1,acc:'helmet'},
+ intro:['Soy la ingeniera de la empresa. Mi jefe quiere sacar todo el petróleo y el carbón en cinco años. Algunos vecinos no quieren que toquemos nada.','Yo creo que hay un camino mejor. ¿Cuál dirías tú?'],
+ ch:{type:'quiz', q:'Según el desarrollo sostenible, ¿cuál es la postura más responsable?',
+  opts:['Aprovechar los recursos de forma responsable, proteger el agua y el bosque e impulsar energías limpias.','Sacar ya mismo todo el petróleo, el carbón y la madera para ganar dinero rápido.','Prohibir toda actividad humana y obligar a las familias a irse de la vereda.','Usar solo carbón y petróleo y dejar de cuidar el agua y el suelo.'],
+  hint:'Sostenible significa que se puede sostener en el tiempo: ni acabar con todo hoy, ni prohibirlo todo.',
+  why:'El desarrollo sostenible busca un equilibrio: atender las necesidades de hoy sin dañar el ambiente ni dejar sin recursos a las próximas generaciones.'},
+ after:'Voy a llevarle esa propuesta a mi jefe. El bosque del nacimiento no se toca.'},
+
+/* ================= 4. ESTACIÓN DE LA MEMORIA ================= */
+{id:'aurelio', d:'memoria', role:'guide', name:'Don Aurelio', x:51, z:29, look:{skin:SK[3],hair:HR[5],shirt:'#3d405b',style:0,acc:'cap'},
+ lesson:[
+  'Bienvenido a la vieja estación, {n}. Soy Aurelio, ferroviario jubilado. Aquí guardamos la historia, pero la niebla está borrando los recuerdos. Y un pueblo que olvida su historia puede repetirla.',
+  'Te cuento lo que pasó en 1928 en Ciénaga, Magdalena. Miles de obreros cortaban banano para una empresa extranjera muy poderosa: la United Fruit Company.',
+  'La empresa los contrataba por medio de intermediarios. Así podía decir «no son empleados nuestros» y no les daba médicos, seguros ni viviendas dignas.',
+  'Tampoco les pagaba con dinero. Les daba VALES que solo servían en los comisariatos, las tiendas de la misma empresa, donde todo era más caro.',
+  'Los obreros hicieron una HUELGA pacífica para pedir que se cumplieran las leyes colombianas. El Gobierno, en vez de escucharlos, envió al Ejército.',
+  'El 6 de diciembre de 1928, en la estación de Ciénaga, los soldados dispararon contra los huelguistas. A ese hecho lo llamamos la Masacre de las Bananeras.',
+  'En esta estación hay documentos de la época. Ayuda a mis amigos a leerlos con cuidado.'],
+ notes:[
+  ['¿Qué pasó?','El 6 de diciembre de 1928, en Ciénaga (Magdalena), el Ejército disparó contra obreros bananeros en huelga.'],
+  ['United Fruit Company','Empresa extranjera que contrataba por intermediarios para decir que los obreros no eran sus empleados.'],
+  ['Vales y comisariatos','Les pagaban con vales que solo servían en las tiendas de la misma empresa.'],
+  ['La huelga','Un reclamo laboral pacífico: pedían ser reconocidos como trabajadores y que se cumpliera la ley.']]},
+{id:'emilia', d:'memoria', name:'Emilia, la archivera', x:60, z:32, look:{skin:SK[1],hair:HR[1],shirt:'#b56576',style:1,acc:'glasses'},
+ intro:['Soy Emilia, la archivera. Se me mezclaron las declaraciones de 1928.','Un mismo hecho puede contarse de formas muy distintas según quién hable. ¿Me ayudas a separarlas?'],
+ ch:{type:'classify', q:'¿Quién diría cada frase?', cats:['La empresa','Los obreros'],
+  items:[['«Esos cortadores no trabajan para nosotros: los contrató un intermediario.»',0],['«Queremos que nos reconozcan como trabajadores de la compañía.»',1],['«La huelga es un peligro para el orden público y la economía.»',0],['«Nos pagan con vales que solo sirven en las tiendas de la empresa.»',1],['«No tenemos obligación de darles hospitales ni seguros.»',0],['«Nuestra protesta es pacífica. Solo pedimos que se cumpla la ley.»',1]],
+  why:'Para entender un hecho histórico hay que comparar las fuentes y preguntarse quién habla y qué le conviene. La empresa negaba tener obligaciones; los obreros reclamaban derechos.',
+  note:['Comparar fuentes','Un mismo hecho se cuenta distinto según quién hable. Pregúntate siempre quién lo dice y qué le conviene.']},
+ after:'¡Archivo ordenado! Así cualquiera puede comparar las dos versiones.'},
+{id:'jacinto', d:'memoria', name:'Jacinto', x:70, z:33, look:{skin:SK[4],hair:HR[0],shirt:'#ffb703',style:0,kid:1},
+ intro:['Mi bisabuelo cortó banano en esa época. En mi casa guardamos uno de los vales con los que le pagaban. Casi nunca vio un billete de verdad.'],
+ ch:{type:'quiz', q:'¿Cómo lograba la empresa no pagar salarios en dinero ni responder por la salud de los trabajadores?',
+  opts:['Los contrataba por medio de intermediarios y les pagaba con vales que solo servían en sus propias tiendas.','Les compraba sus tierras a cambio de pasajes de tren.','Firmaba acuerdos con los sindicatos para construir escuelas con los salarios.','Cerraba los puertos para que no compraran productos extranjeros.'],
+  hint:'Don Aurelio mencionó dos trucos: uno sobre quién los contrataba y otro sobre con qué les pagaban.',
+  why:'Con la contratación indirecta, la empresa decía que no eran sus empleados y evadía la ley. Con los vales, el salario regresaba a la misma empresa a través de sus comisariatos.'},
+ after:'Mi bisabuelo decía lo mismo: trabajaban para la empresa y le devolvían la plata a la empresa.'},
+{id:'nubia', d:'memoria', name:'Nubia, la periodista', x:64, z:43, look:{skin:SK[2],hair:HR[4],shirt:'#06a77d',style:2},
+ intro:['Soy Nubia, periodista. Mira este titular de 1928: llama a la huelga «movimiento peligroso».','Los obreros, en cambio, decían que era un reclamo pacífico.'],
+ ch:{type:'quiz', q:'¿Por qué les convenía a la empresa y al Gobierno de entonces presentar la huelga como una amenaza al orden público?',
+  opts:['Porque así justificaban usar al Ejército, sin negociar ni ceder ante los reclamos de los obreros.','Porque querían llevar a los obreros a trabajar en fábricas de las ciudades.','Porque querían demostrar que en Colombia no había leyes laborales.','Porque querían que los campesinos cambiaran el banano por la minería.'],
+  hint:'Si dices que alguien es peligroso, ¿qué tipo de respuesta empieza a parecer «justificada»?',
+  why:'Llamar «peligro» a un reclamo laboral servía para justificar la fuerza militar. Así evitaban negociar y la empresa no tenía que cumplir las leyes colombianas.'},
+ after:'Por eso un buen periodista siempre pregunta: ¿a quién le sirve que esto se cuente así?'},
+{id:'hernan', d:'memoria', name:'Profe Hernán', x:55, z:42, look:{skin:SK[1],hair:HR[2],shirt:'#7b5cd6',style:0,acc:'glasses'},
+ intro:['Un año después, en el Congreso, se denunció que el Estado se había arrodillado ante la empresa extranjera y había usado los fusiles contra sus propios trabajadores.'],
+ ch:{type:'quiz', q:'¿Qué consecuencia tuvo la masacre en la sociedad colombiana?',
+  opts:['Mucha gente perdió la confianza en el Gobierno de la época y creció el descontento social.','Se prohibió para siempre vender frutas a otros países.','Los trabajadores aceptaron los vales y nunca volvieron a protestar.','El Ejército pasó a administrar las plantaciones y a repartir las ganancias.'],
+  hint:'Piensa en cómo se sentiría un país al saber que su Gobierno disparó contra trabajadores que protestaban en paz.',
+  why:'La masacre indignó al país. El Gobierno perdió credibilidad y aumentó el descontento social, lo que impulsó cambios políticos en los años siguientes.',
+  note:['Consecuencia','Pérdida de confianza en el Gobierno de la época y aumento del descontento social.']},
+ after:'Exacto. Por eso recordamos esta fecha: para exigir que no se repita.'},
+{id:'teresa', d:'memoria', name:'Teresa, la abogada', x:52, z:36, look:{skin:SK[3],hair:HR[0],shirt:'#ef476f',style:1},
+ intro:['Soy Teresa, abogada. La historia sirve para no repetir errores.','Imagina que hoy llega una multinacional a un municipio. Ofrece muchos empleos, pero le pide al alcalde que prohíba los sindicatos y que no le cobre impuestos.'],
+ ch:{type:'quiz', q:'Con lo aprendido de 1928, ¿qué debería hacer el Estado?',
+  opts:['Permitir la inversión solo si la empresa respeta las leyes del país, los derechos de los trabajadores y sus deberes con el Estado.','Aceptar todas las condiciones, porque las ganancias de la empresa importan más que las leyes.','Enviar a la fuerza pública para impedir que los trabajadores se reúnan.','Prohibir que la gente del municipio trabaje en empresas privadas.'],
+  hint:'Ni arrodillarse ante la empresa ni cerrarle la puerta. ¿Qué opción defiende las leyes y a los trabajadores?',
+  why:'El Estado debe proteger a sus ciudadanos y su soberanía. La inversión es bienvenida cuando cumple la Constitución, respeta el derecho a asociarse y paga lo que le corresponde.',
+  note:['La lección para hoy','El Estado debe permitir la inversión solo si respeta la soberanía, las leyes y los derechos de los trabajadores.']},
+ after:'Bien pensado. Empleo sí, pero con derechos y con respeto por el país.'},
+
+/* ================= 5. AVENIDA DEL COLEGIO ================= */
+{id:'paola', d:'avenida', role:'guide', name:'Agente Paola', x:4, z:61, look:{skin:SK[2],hair:HR[0],shirt:'#2d6a4f',style:0,acc:'cap'},
+ lesson:[
+  '¡Alto ahí, {n}! Calma, es broma. Soy la agente Paola. Desde que cayó la niebla, en esta avenida nadie respeta las normas.',
+  'Las señales de tránsito hablan con colores. Las PREVENTIVAS son amarillas y advierten un peligro cercano, como la zona escolar.',
+  'Las REGLAMENTARIAS llevan rojo y dan órdenes que hay que cumplir, como PARE o la velocidad máxima.',
+  'Las INFORMATIVAS son azules y dan datos útiles, como dónde queda un paradero o un hospital.',
+  'Cada quien tiene su lugar: el peatón cruza por la cebra, el ciclista va por la ciclorruta y el conductor respeta la velocidad.',
+  'Los carros de esta avenida frenan cuando te ven. Aun así, cruza siempre por la cebra.'],
+ notes:[
+  ['Señales preventivas','Amarillas. Advierten un peligro: zona escolar, curva peligrosa.'],
+  ['Señales reglamentarias','Con rojo. Ordenan o prohíben: PARE, velocidad máxima.'],
+  ['Señales informativas','Azules. Informan: paradero, hospital.'],
+  ['Cada quien en su lugar','Peatón por la cebra, ciclista por la ciclorruta, conductor dentro del límite de velocidad.']]},
+{id:'julian', d:'avenida', name:'Julián, el ciclista', x:-8, z:69, look:{skin:SK[1],hair:HR[1],shirt:'#ef476f',style:0,acc:'helmet'},
+ intro:['¡Uf, casi me estrello! Venía por el andén porque no entiendo las señales. ¿Me enseñas a leerlas?'],
+ ch:{type:'classify', q:'¿De qué tipo es cada señal?', cats:['Preventiva','Reglamentaria','Informativa'],
+  items:[['Rombo amarillo con dos escolares caminando',0],['Octágono rojo que dice PARE',1],['Cuadro azul con un bus: paradero',2],['Círculo de borde rojo: velocidad máxima 30',1],['Rombo amarillo: curva peligrosa',0],['Cuadro azul con una H: hospital',2]],
+  why:'Amarillo previene, rojo ordena y azul informa. La señal de zona escolar es preventiva: avisa a los conductores que puede haber niños cruzando.'},
+ after:'¡Entendido! Y de ahora en adelante voy por la ciclorruta, no por el andén.'},
+{id:'marta', d:'avenida', name:'Doña Marta', x:10, z:67, look:{skin:SK[3],hair:HR[1],shirt:'#f77f00',style:1,acc:'apron'},
+ intro:['Tengo mi puesto de jugos frente al colegio hace veinte años. A la hora de salida veo de todo. Mira lo que anoté esta semana.'],
+ ch:{type:'quiz', ctx:'Lista de Doña Marta:\n1. Niños que cruzan corriendo por la mitad de la cuadra.\n2. Ciclistas que van por el andén.\n3. Carros que pasan rápido frente al colegio.\n4. Una señora que espera el bus en el paradero.',
+  q:'¿Cuáles situaciones de la lista son un riesgo para la seguridad vial?',
+  opts:['La 1, la 2 y la 3: no respetan la cebra, la ciclorruta ni la velocidad de la zona escolar.','Solo la 4, porque esperar el bus es peligroso.','Ninguna, porque no ha habido accidentes.','Solo la 3, porque únicamente los carros causan accidentes.'],
+  hint:'Revisa una por una: ¿cada persona está usando el lugar que le corresponde en la vía?',
+  why:'Peatones, ciclistas y conductores comparten la vía y todos deben cumplir las normas. Cruzar fuera de la cebra, pedalear por el andén y exceder la velocidad ponen en peligro a todos.'},
+ after:'Eso mismo pensaba yo. Voy a pegar tu respuesta en mi puesto para que todos la lean.'},
+{id:'sara', d:'avenida', name:'Sara', x:0, z:88, look:{skin:SK[0],hair:HR[3],shirt:'#118ab2',style:2,kid:1},
+ intro:['¡Cruzaste por la cebra, muy bien! Mi grupo observó esta esquina durante una semana.','No hubo ningún accidente, pero concluimos que el riesgo es alto. Un compañero dice que exageramos.'],
+ ch:{type:'quiz', q:'¿Por qué hay un riesgo alto aunque no haya ocurrido ningún accidente?',
+  opts:['Porque el riesgo depende de que las conductas imprudentes se repitan, no de si ya hubo un accidente.','Porque seguro ya había ocurrido un accidente grave antes.','Porque la policía avisó que venía un peligro.','Porque los conductores confesaron sus infracciones.'],
+  hint:'Riesgo no es lo mismo que accidente. El riesgo es la posibilidad de que ocurra.',
+  why:'Riesgo es la posibilidad de que algo malo pase. Si las imprudencias se repiten todos los días, esa posibilidad crece. Prevenir es actuar antes del accidente.',
+  note:['Riesgo','Depende de las conductas imprudentes que se repiten, no de si ya ocurrió un accidente.']},
+ after:'¡Gracias! Con eso convenzo a mi compañero. Vamos a proponer una campaña de seguridad vial.'},
+
+/* ================= 6. PARQUE DE LAS VOCES ================= */
+{id:'sofia', d:'parque', role:'guide', name:'Personera Sofía', x:-50, z:29, look:{skin:SK[1],hair:HR[2],shirt:'#7b5cd6',style:2,kid:1},
+ lesson:[
+  '¡Hola, {n}! Soy Sofía, la personera estudiantil. Antes este parque estaba lleno de gente que opinaba y proponía. Con la niebla, todos dicen «eso no es problema mío».',
+  'Vivir en comunidad es CONVIVIR: pensar en cómo mis actos afectan a los demás, a los animales y a la naturaleza.',
+  'Cuando hay un problema, primero miramos qué intereses chocan. A veces alguien necesita trabajar y, al mismo tiempo, hay que cuidar el ambiente.',
+  'También es importante ARGUMENTAR: dar razones que apoyen lo que decimos, en vez de gritar o burlarnos.',
+  'Y PARTICIPAR: todo estudiante puede llevar sus ideas al consejo de estudiantes para que se discutan. Tu voz cuenta.'],
+ notes:[
+  ['Convivir','Pensar en cómo mis actos afectan a los demás, a los animales y a la naturaleza.'],
+  ['Analizar un problema','Identificar qué aspectos o intereses chocan, por ejemplo el económico y el ambiental.'],
+  ['Argumentar','Dar razones que apoyen una idea.'],
+  ['Participar','Todo estudiante puede presentar sus ideas al consejo de estudiantes para que se discutan.']]},
+{id:'efrain', d:'parque', name:'Don Efraín', x:-70, z:34, look:{skin:SK[3],hair:HR[0],shirt:'#588157',style:0,acc:'hat'},
+ intro:['Soy el guardaparques. Varias familias venden cometas y comida dentro del humedal. Es su sustento.','Pero cada tarde recojo bolsas, pitillos y empaques entre los nidos de las garzas.'],
+ ch:{type:'quiz', q:'Para resolver esta situación de forma justa, ¿qué dos aspectos hay que tener en cuenta?',
+  opts:['El económico y el ambiental.','El político y el religioso.','El deportivo y el académico.','El étnico y el tecnológico.'],
+  hint:'Piensa en qué necesitan los vendedores y en qué necesita el humedal.',
+  why:'Los vendedores necesitan ingresos (aspecto económico) y el humedal necesita protección (aspecto ambiental). Una buena solución cuida las dos cosas: por ejemplo, puntos de venta ordenados y canecas.'},
+ after:'Buena idea. Voy a reunirme con las familias para organizar las ventas y poner canecas.'},
+{id:'camila', d:'parque', name:'Camila', x:-58, z:44, look:{skin:SK[0],hair:HR[4],shirt:'#ffb703',style:2,kid:1},
+ intro:['¡Mi gata tuvo cinco gaticos! Los traje para regalárselos al primero que pase.','Pero mi amigo Andrés me dijo: «No los regales sin saber si los van a cuidar bien. ¿Y si después los abandonan?»'],
+ ch:{type:'quiz', q:'¿Cuál idea apoya lo que dijo Andrés?',
+  opts:['Tener una mascota exige responsabilidad y compromiso.','Los gatos deben venderse, no regalarse.','Nadie debería tener gatos en su casa.','Los gatos no deben salir a la calle.'],
+  hint:'Andrés no habla de dinero ni de prohibir mascotas. Le preocupa cómo los van a cuidar.',
+  why:'Andrés defiende la tenencia responsable: antes de entregar un animal hay que asegurarse de que tendrá un buen hogar. Las otras opciones hablan de cosas que él no dijo.',
+  note:['Apoyar una idea','Busca la razón que dice lo mismo que la persona, no algo parecido que ella nunca dijo.']},
+ after:'Tiene razón. Voy a preguntarle a cada familia si de verdad puede cuidarlos.'},
+{id:'nico', d:'parque', name:'Nico', x:-70, z:46, look:{skin:SK[2],hair:HR[0],shirt:'#118ab2',style:4,kid:1},
+ intro:['Hoy entregaron las notas de Matemáticas y a Lucas le fue excelente.','Un compañero al que le fue mal le gritó delante de todos: «¡Cuatro ojos, sabelotodo!». Lucas se puso muy triste.'],
+ ch:{type:'quiz', q:'¿Qué buscaba el compañero con ese comentario?',
+  opts:['Que los demás se burlaran de Lucas por su apariencia.','Que la profesora le bajara la nota a Lucas.','Que los compañeros felicitaran a Lucas.','Que la profesora se enojara con Lucas.'],
+  hint:'Lo dijo delante de todos y usó un apodo sobre sus gafas. ¿A quién le hablaba en realidad?',
+  why:'Fue una burla sobre su apariencia para hacerlo sentir mal ante el grupo. Eso es discriminación y daña la convivencia. Tú puedes frenarla: no te rías y apoya a quien la recibe.'},
+ after:'Yo no me reí. Ahora voy a buscar a Lucas para decirle que cuenta conmigo.'},
+{id:'andres', d:'parque', name:'Andrés', x:-52, z:40, look:{skin:SK[4],hair:HR[0],shirt:'#06a77d',style:0,kid:1},
+ intro:['Creo que en el lote vacío del colegio podríamos sembrar una huerta para aprender de dónde viene la comida.','Pero solo soy un estudiante. No soy representante de nada.'],
+ ch:{type:'quiz', q:'¿Puede Andrés participar para que su idea se haga realidad?',
+  opts:['Sí. Puede presentar su idea al consejo de estudiantes para que la discutan.','Sí, porque el colegio está obligado a hacer todo lo que proponga cada estudiante.','No, porque solo los representantes pueden tener ideas.','No, porque el gobierno estudiantil solo se ocupa de las notas.'],
+  hint:'Participar es un derecho de todos. Pero proponer no significa que la idea se apruebe automáticamente.',
+  why:'Todos los estudiantes pueden proponer. El consejo de estudiantes escucha, discute y decide qué ideas mejoran la vida del colegio. Participar no garantiza que se apruebe, pero sí que se escuche.'},
+ after:'¡Entonces sí puedo! Voy a escribir mi propuesta de la huerta para el consejo.'}
+];
+
+const DONE_LINES = {
+  espejos:'¡Cuic! Los espejos volvieron a mostrar a la gente tal como es. (Chigüi encontró una tesela roja.)',
+  feria:'¡Cuic, cuic! Vuelve a sonar el arpa en la feria. (Chigüi encontró una tesela naranja.)',
+  cano:'¡Cuic! El caño corre limpio otra vez. (Chigüi encontró una tesela verde.)',
+  memoria:'¡Cuic! La estación recordó su historia. (Chigüi encontró una tesela azul.)',
+  avenida:'¡Cuic, cuic! Ahora todos respetan las señales. (Chigüi encontró una tesela amarilla.)',
+  parque:'¡Cuic! El parque se llenó de voces otra vez. (Chigüi encontró una tesela morada.)'
+};
+
+const FINAL_LINES = [
+  '¡{n}! Mira a tu alrededor: Villa Mosaico recuperó todos sus colores. Trajiste las seis teselas.',
+  'La Niebla Gris no se vence con fuerza. Se vence cuando respetamos a los demás, cuidamos lo nuestro, recordamos la historia y participamos.',
+  'Solo falta una cosa para sellar el Gran Mosaico: tu juramento. Escríbelo con tus propias palabras.'
+];
+
+/* ---------- distribución de casas y árboles (determinista) ---------- */
+const ROADS = [];
+DISTRICTS.forEach((d,i)=>{ ROADS.push([0,0,d.cx,d.cz]); const e=DISTRICTS[(i+1)%6]; ROADS.push([d.cx,d.cz,e.cx,e.cz]); });
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function distSeg(px,pz,s){const vx=s[2]-s[0],vz=s[3]-s[1];let t=((px-s[0])*vx+(pz-s[1])*vz)/(vx*vx+vz*vz);t=Math.max(0,Math.min(1,t));return Math.hypot(px-(s[0]+vx*t),pz-(s[1]+vz*t));}
+function nearestDistrict(x,z){let b=null,bd=1e9;DISTRICTS.forEach(d=>{const q=Math.hypot(x-d.cx,z-d.cz);if(q<bd){bd=q;b=d;}});return Math.hypot(x,z)<24?null:b;}
+function buildLayout(){
+  const r=rng(11), col=[], houses=[], trees=[];
+  Object.keys(B).forEach(k=>{const o=B[k]; col.push(o.r?{x:o.x,z:o.z,r:o.r}:{x0:o.x-o.w/2,x1:o.x+o.w/2,z0:o.z-o.d/2,z1:o.z+o.d/2});});
+  [CEIBA].concat(NPCS).forEach(n=>col.push({x:n.x,z:n.z,r:.75}));
+  const free=(x,z,m)=>{
+    if(Math.hypot(x,z)<19+m) return false;
+    for(const d of DISTRICTS) if(Math.hypot(x-d.cx,z-d.cz)<27+m) return false;
+    if(Math.abs(z-78)<8+m && Math.abs(x)<42) return false;
+    if(x>70-m && z<2 && z>-78) return false;
+    if(Math.abs(z-49)<4+m && x>30) return false;
+    for(const s of ROADS) if(distSeg(x,z,s)<3.2+m) return false;
+    return true;};
+  for(let gx=-91;gx<=91;gx+=13) for(let gz=-91;gz<=91;gz+=13){
+    const x=gx+(r()-.5)*5, z=gz+(r()-.5)*5, w=5+r()*2.5, d=4.5+r()*2, h=2.8+r()*1.8, c=r(), rf=r();
+    if(r()<.82 && free(x,z,4.2)){ houses.push({x,z,w,d,h,c,rf}); col.push({x0:x-w/2,x1:x+w/2,z0:z-d/2,z1:z+d/2}); }
+  }
+  for(let i=0;i<330 && trees.length<120;i++){
+    const x=(r()-.5)*204, z=(r()-.5)*204, s=.8+r()*.7, k=r();
+    if(!free(x,z,1.6)) continue;
+    if(houses.some(h=>Math.abs(x-h.x)<h.w/2+2 && Math.abs(z-h.z)<h.d/2+2)) continue;
+    if(trees.some(t=>Math.hypot(x-t.x,z-t.z)<3)) continue;
+    trees.push({x,z,s,k}); col.push({x,z,r:.6});
+  }
+  return {col,houses,trees};
+}
+
+</script>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const el=(tag,cls,txt)=>{const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e;};
+const KEY='ciudad_mosaico_v1';
+const SHIRTS=['#ef476f','#ffb703','#06a77d','#118ab2','#7b5cd6','#f77f00'];
+const STYLES=['Corto','Largo','Coletas','Afro','Gorra'];
+const RETOS=NPCS.filter(n=>n.ch), MAXSTARS=RETOS.length*3;
+const guideOf=id=>NPCS.find(n=>n.d===id&&n.role==='guide');
+const retosOf=id=>NPCS.filter(n=>n.d===id&&n.ch);
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+/* ---------- estado y guardado ---------- */
+function fresh(){return {name:'',g:'Guardián',look:{skin:SK[1],hair:HR[0],shirt:SHIRTS[3],style:0},intro:false,guides:{},solved:{},done:{},final:false,oath:'',pos:[0,7],mute:false};}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.look&&typeof s.name==='string') return Object.assign(fresh(),s);}catch(e){} return null;}
+function save(){try{S.pos=[P.x,P.z]; localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+let S=load()||fresh();
+const hadSave=!!S.name;
+const fmt=t=>t.replace(/\{n\}/g,S.name).replace(/\{g\}/g,S.g);
+const stars=()=>Object.values(S.solved).reduce((a,b)=>a+b,0);
+
+/* ---------- sonido ---------- */
+let AC=null;
+function beep(f,d,type,vol){ if(S.mute) return; try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type||'triangle'; o.frequency.value=f; g.gain.setValueAtTime(vol||.07,AC.currentTime); g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+d);}catch(e){} }
+const sfx={tap:()=>beep(520,.06), ok:()=>{beep(660,.12);setTimeout(()=>beep(880,.2),110);}, bad:()=>beep(170,.22,'sawtooth',.04), win:()=>[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.25),i*130))};
+
+/* ---------- escena ---------- */
+const canvas=$('#gl'); let renderer;
+try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true}); }catch(e){ $('#vTitle').hidden=true; $('#nogl').hidden=false; return; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,1,.5,460);
+const SKY_G=new THREE.Color('#b4b8bf'), SKY_C=new THREE.Color('#8fd3ff');
+scene.background=SKY_G.clone(); scene.fog=new THREE.Fog(SKY_G.getHex(),60,190);
+scene.add(new THREE.HemisphereLight(0xeaf6ff,0x88a06f,.62));
+const sun=new THREE.DirectionalLight(0xfff1d6,.52); sun.position.set(40,70,50); scene.add(sun);
+
+const TG={}; ['all'].concat(DISTRICTS.map(d=>d.id)).forEach(k=>TG[k]={f:0,t:0,mats:[],cache:{}});
+function TM(hex,gid){const G=TG[gid||'all']; if(G.cache[hex]) return G.cache[hex]; const m=new THREE.MeshPhongMaterial({color:hex,flatShading:true,shininess:0,specular:0x000000}); G.mats.push({m,b:new THREE.Color(hex)}); return G.cache[hex]=m;}
+const CMc={}; function CM(hex){return CMc[hex]||(CMc[hex]=new THREE.MeshPhongMaterial({color:hex,flatShading:true,shininess:0,specular:0x000000}));}
+let _ps=7; const prnd=()=>(_ps=_ps*16807%2147483647)/2147483647;
+const COB=(function(){const c=document.createElement('canvas'); c.width=c.height=128; const x=c.getContext('2d');
+  x.fillStyle='#b4ac9c'; x.fillRect(0,0,128,128);
+  for(let j=0;j<4;j++) for(let i=0;i<4;i++){const l=80+prnd()*13; x.fillStyle='hsl(38,'+(10+prnd()*8)+'%,'+l+'%)'; x.fillRect(i*32+1.5,j*32+1.5,29,29);}
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;})();
+function cob(rx,ry){const t=COB.clone(); t.needsUpdate=true; t.repeat.set(rx,ry); return t;}
+function TMap(hex,gid,map){const m=new THREE.MeshPhongMaterial({color:hex,map:map,flatShading:true,shininess:0,specular:0x000000}); TG[gid||'all'].mats.push({m,b:new THREE.Color(hex)}); return m;}
+function TMd(hex){const m=new THREE.MeshPhongMaterial({color:hex,flatShading:true,shininess:0,specular:0x000000,side:THREE.DoubleSide}); TG.all.mats.push({m,b:new THREE.Color(hex)}); return m;}
+const _g=new THREE.Color();
+function applyTint(G){G.mats.forEach(o=>{const l=o.b.r*.3+o.b.g*.59+o.b.b*.11; _g.setRGB(l*.6+.24,l*.6+.25,l*.6+.28); o.m.color.copy(_g).lerp(o.b,G.f);});}
+
+function add(geo,mat,x,y,z,par){const m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); (par||scene).add(m); return m;}
+const bx=(w,h,d)=>new THREE.BoxGeometry(w,h,d);
+const cy=(a,b,h,s)=>new THREE.CylinderGeometry(a,b,h,s||10);
+const sp=(r,w,h)=>new THREE.SphereGeometry(r,w||10,h||8);
+const co=(r,h,s)=>new THREE.ConeGeometry(r,h,s||8);
+const flat=(geo,mat,x,y,z)=>{const m=add(geo,mat,x,y,z); m.rotation.x=-Math.PI/2; return m;};
+
+function label(text,bg,fg,h){
+  const c=document.createElement('canvas'),x=c.getContext('2d'),F='800 40px Nunito, "Segoe UI", Arial, sans-serif';
+  x.font=F; const w=Math.ceil(x.measureText(text).width)+44; c.width=w; c.height=64; x.font=F;
+  x.fillStyle=bg; const r=22; x.beginPath(); x.moveTo(r,2); x.arcTo(w-2,2,w-2,62,r); x.arcTo(w-2,62,2,62,r); x.arcTo(2,62,2,2,r); x.arcTo(2,2,w-2,2,r); x.fill();
+  x.fillStyle=fg; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,w/2,34);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false}));
+  s.scale.set(h*w/64,h,1); return s;
+}
+function badgeMat(ch,bg){const c=document.createElement('canvas'),x=c.getContext('2d'); c.width=c.height=96; x.fillStyle='#1b2a4a'; x.beginPath(); x.arc(48,48,46,0,7); x.fill(); x.fillStyle=bg; x.beginPath(); x.arc(48,48,38,0,7); x.fill(); x.fillStyle='#1b2a4a'; x.font='800 58px Arial, sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(ch,48,52); return new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false});}
+const MK={go:badgeMat('!','#ffb703'),lock:badgeMat('…','#c9ced8'),ok:badgeMat('✓','#7be0b0')};
+
+/* ---------- personajes ---------- */
+function person(look){
+  const g=new THREE.Group(), skin=CM(look.skin), shirt=CM(look.shirt), pants=CM(look.pants||'#2f3e63'), hair=CM(look.hair), dark=CM('#1b1b1f'), shoe=CM('#3a2a22');
+  const limb=(x,y,build)=>{const p=new THREE.Group(); p.position.set(x,y,0); g.add(p); build(p); return p;};
+  const leg=p=>{add(bx(.3,.62,.32),pants,0,-.31,0,p); add(bx(.32,.16,.44),shoe,0,-.66,.05,p);};
+  const arm=p=>{add(bx(.22,.5,.26),shirt,0,-.22,0,p); add(bx(.2,.2,.22),skin,0,-.56,0,p);};
+  const legL=limb(-.19,.74,leg), legR=limb(.19,.74,leg), armL=limb(-.53,1.44,arm), armR=limb(.53,1.44,arm);
+  add(bx(.82,.78,.5),shirt,0,1.12,0,g);
+  const head=new THREE.Group(); head.position.set(0,2,0); g.add(head);
+  add(sp(.46,14,10),skin,0,0,0,head);
+  add(sp(.06,6,6),dark,-.16,.02,.42,head); add(sp(.06,6,6),dark,.16,.02,.42,head);
+  add(bx(.16,.04,.03),CM('#a8483f'),0,-.17,.43,head);
+  const st=look.style|0;
+  if(st!==3){ const cap=add(new THREE.SphereGeometry(.495,14,8,0,Math.PI*2,0,Math.PI*.55),st===4?shirt:hair,0,.03,-.03,head); cap.rotation.x=-.3; }
+  if(st===1) add(bx(.82,.62,.24),hair,0,-.2,-.33,head);
+  if(st===2){ add(sp(.19,8,6),hair,-.52,.02,-.05,head); add(sp(.19,8,6),hair,.52,.02,-.05,head); }
+  if(st===3) add(sp(.57,10,8),hair,0,.27,-.17,head);
+  if(st===4){ add(bx(.52,.06,.32),shirt,0,.16,.5,head); add(bx(.84,.3,.2),hair,0,-.12,-.34,head); }
+  const a=look.acc;
+  if(a==='hat'){ add(cy(.78,.78,.05,14),CM('#e9d8a6'),0,.36,0,head); add(cy(.32,.38,.3,12),CM('#e9d8a6'),0,.52,0,head); add(cy(.385,.385,.07,12),CM('#6b4226'),0,.41,0,head); }
+  if(a==='glasses'){ [-.17,.17].forEach(x=>{const t=add(new THREE.TorusGeometry(.105,.022,6,12),dark,x,.02,.44,head);}); add(bx(.1,.03,.03),dark,0,.03,.45,head); }
+  if(a==='cap'){ add(cy(.4,.46,.22,12),CM('#22333b'),0,.42,0,head); add(bx(.5,.05,.3),CM('#22333b'),0,.33,.45,head); add(bx(.84,.14,.52),CM('#d9f99d'),0,1.2,0,g); }
+  if(a==='helmet'){ add(new THREE.SphereGeometry(.53,12,8,0,Math.PI*2,0,Math.PI*.5),CM('#ffd60a'),0,.08,0,head); }
+  if(a==='apron'){ add(bx(.6,.7,.06),CM('#ffffff'),0,1.05,.27,g); }
+  if(a==='vest'){ add(bx(.86,.5,.54),CM('#b7f34d'),0,1.18,0,g); }
+  if(a==='pack'){ add(bx(.56,.6,.26),CM('#ffb703'),0,1.14,-.36,g); }
+  const sh=flat(new THREE.CircleGeometry(.62,14),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.22,depthWrite:false}),0,.16,0); g.add(sh);
+  g.userData={legL,legR,armL,armR,head};
+  return g;
+}
+function swing(g,t,amt){const u=g.userData,a=Math.sin(t)*amt; u.legL.rotation.x=a; u.legR.rotation.x=-a; u.armL.rotation.x=-a*.9; u.armR.rotation.x=a*.9;}
+function capybara(){
+  const g=new THREE.Group(), b=CM('#9a6b3f'), d=CM('#6f4a28');
+  add(bx(.62,.5,.95),b,0,.5,0,g); add(bx(.46,.42,.46),b,0,.72,.58,g); add(bx(.4,.26,.2),d,0,.64,.86,g);
+  add(bx(.1,.12,.08),d,-.17,.98,.5,g); add(bx(.1,.12,.08),d,.17,.98,.5,g);
+  add(sp(.045,6,6),CM('#1b1b1f'),-.2,.8,.76,g); add(sp(.045,6,6),CM('#1b1b1f'),.2,.8,.76,g);
+  [[-.2,.32],[.2,.32],[-.2,-.32],[.2,-.32]].forEach(p=>add(bx(.16,.28,.16),d,p[0],.14,p[1],g));
+  const sh=flat(new THREE.CircleGeometry(.55,12),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.2,depthWrite:false}),0,.16,0); g.add(sh);
+  return g;
+}
+
+/* ---------- mundo ---------- */
+const L=buildLayout();
+const gone=[];   /* objetos que desaparecen al sanar un barrio: {d, obj} */
+function buildWorld(){
+  flat(new THREE.PlaneGeometry(700,700),TM('#8ccf6b'),0,0,0);
+  ROADS.forEach(s=>{const dx=s[2]-s[0],dz=s[3]-s[1],len=Math.hypot(dx,dz),m=add(bx(len,.06,5),TMap('#d9d2c2','all',cob(len/4,1.25)),(s[0]+s[2])/2,.03,(s[1]+s[3])/2); m.rotation.y=-Math.atan2(dz,dx);});
+  for(let i=0;i<16;i++){const a=i/16*Math.PI*2,m=add(sp(1,8,6),TM('#79b862'),Math.cos(a)*175,-3,Math.sin(a)*175); m.scale.set(46+(i%3)*12,13+(i%4)*5,46);}
+  const roofGeo=co(.7071,1,4); roofGeo.rotateY(Math.PI/4);
+  const HC=['#ffd6a5','#fdf3a7','#caffbf','#a9e9ff','#cdc2ff','#ffc6e5','#fff1e6','#ffb3ad'], RC=['#c8553d','#b5523b','#7d4f50','#9a6b4f'];
+  const doorG=bx(1,1.7,.1), winG=bx(1.1,1,.1);
+  const WIN=[];
+  L.houses.forEach(h=>{const d=nearestDistrict(h.x,h.z),gid=d?d.id:'all',two=Math.hypot(h.x,h.z)<58&&h.c>.3,hh=two?h.h+2.4:h.h;
+    add(bx(h.w,hh,h.d),TM(HC[Math.floor(h.c*8)],gid),h.x,hh/2,h.z);
+    add(bx(h.w+.44,.3,h.d+.44),TM('#f7f3e8',gid),h.x,hh-.05,h.z);
+    const r=add(roofGeo,TM(RC[Math.floor(h.rf*4)],gid),h.x,hh+.8,h.z); r.scale.set(h.w+.7,1.6,h.d+.7);
+    if(h.rf>.5) add(bx(.55,1.15,.55),TM('#a98577',gid),h.x+h.w*.26,hh+1.15,h.z);
+    add(doorG,TM('#6b4226',gid),h.x-h.w*.2,.85,h.z+h.d/2+.04);
+    if(h.c>.6){const aw=add(bx(1.7,.1,1),TM(['#e5484d','#118ab2','#f77f00'][Math.floor(h.rf*3)],gid),h.x-h.w*.2,2.15,h.z+h.d/2+.5); aw.rotation.x=.3;}
+    const fls=two?[1.95,4.15]:[1.95];
+    fls.forEach((y,fi)=>{ WIN.push({x:h.x+h.w*.22,y,z:h.z+h.d/2+.06,ry:0}); if(fi>0) WIN.push({x:h.x-h.w*.2,y,z:h.z+h.d/2+.06,ry:0});
+      WIN.push({x:h.x+h.w/2+.06,y,z:h.z+h.d*.12,ry:Math.PI/2}); WIN.push({x:h.x-h.w/2-.06,y,z:h.z-h.d*.12,ry:Math.PI/2}); });
+  });
+  const trG=cy(.22,.32,1.6,6), icG=new THREE.IcosahedronGeometry(1.4,0), cnG=co(1.3,2.4,7);
+  L.trees.forEach(t=>{const d=nearestDistrict(t.x,t.z),gid=d?d.id:'all',g=new THREE.Group(); g.position.set(t.x,0,t.z); g.scale.setScalar(t.s); scene.add(g);
+    add(trG,TM('#7a5230',gid),0,.8,0,g);
+    if(t.k<.55){ add(icG,TM('#3f9d54',gid),0,2.5,0,g); add(icG,TM('#55b866',gid),.5,3.3,.2,g).scale.setScalar(.7); }
+    else { add(cnG,TM('#2f8f5b',gid),0,2.6,0,g); add(cnG,TM('#3fa56a',gid),0,3.8,0,g).scale.setScalar(.75); }});
+  const cl=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.9,fog:false});
+  for(let i=0;i<8;i++){const g=new THREE.Group(); g.position.set(-150+i*42,44+(i%3)*7,-120+((i*53)%160)); scene.add(g); clouds.push(g);
+    [[0,0,0,7],[6,-1,1,5],[-6,-1,-1,5.5]].forEach(c=>{add(sp(1,8,6),cl,c[0],c[1],c[2],g).scale.set(c[3],c[3]*.5,c[3]*.8);});}
+
+  /* --- plaza central --- */
+  flat(new THREE.CircleGeometry(19,40),TMap('#ecdfc2','all',cob(9.5,9.5)),0,.11,0); flat(new THREE.RingGeometry(9,10,40),TM('#cdb98c'),0,.14,0);
+  add(bx(8.6,6,1.2),TM('#f3efe6'),0,3,-7.9); add(bx(9.4,.5,1.8),TM('#b9a98a'),0,.25,-7.7);
+  const disc=add(new THREE.CircleGeometry(2.75,36),new THREE.MeshBasicMaterial({color:0x1b2a4a}),0,3.3,-7.27);
+  DISTRICTS.forEach((d,i)=>{const m=new THREE.MeshBasicMaterial({color:0xaab0ba}); add(new THREE.CircleGeometry(2.5,10,Math.PI/2-(i+1)*Math.PI/3,Math.PI/3-.06),m,0,3.3,-7.25); wedges[d.id]=m;});
+  add(new THREE.CircleGeometry(.6,16),new THREE.MeshBasicMaterial({color:0x1b2a4a}),0,3.3,-7.23);
+  const pl=label('El Gran Mosaico','#1b2a4a','#ffffff',.9); pl.position.set(0,7,-7.6); scene.add(pl);
+  add(cy(1.1,1.5,6,8),TM('#7a5230'),B.ceiba.x,3,B.ceiba.z);
+  [[0,8.5,0,4.6],[2.5,7.5,1.5,3],[-3,7.8,-1,3.2]].forEach(c=>add(new THREE.IcosahedronGeometry(c[3],1),TM('#3f9d54'),B.ceiba.x+c[0],c[1],B.ceiba.z+c[2]));
+  [B.lampA,B.lampB].forEach(o=>{add(cy(.1,.14,3.6,6),TM('#3d405b'),o.x,1.8,o.z); add(sp(.36,8,6),new THREE.MeshBasicMaterial({color:0xfff3b0}),o.x,3.8,o.z);});
+
+  /* --- rótulos de barrio --- */
+  DISTRICTS.forEach((d,i)=>{const s=label((i+1)+' · '+d.name,d.tint,'#1b2a4a',1.5); s.position.set(d.cx,11,d.cz-6); scene.add(s);});
+
+  /* --- 1. espejos --- */
+  let id='espejos', o=B.school;
+  flat(new THREE.CircleGeometry(27,40),TM('#f1d8cb',id),-62,.11,-36);
+  add(bx(o.w,5,o.d),TM('#ffe39a',id),o.x,2.5,o.z); add(bx(o.w+1,.5,o.d+1),TM('#c8553d',id),o.x,5.25,o.z);
+  add(bx(2.2,2.6,.12),TM('#6b4226',id),o.x,1.3,o.z+o.d/2+.05);
+  for(let i=0;i<6;i++){ if(i===2||i===3) continue; add(bx(1.6,1.4,.12),TM('#d7f1ff',id),o.x-7.5+i*3,3,o.z+o.d/2+.05); }
+  add(cy(.08,.08,4,6),TM('#3d405b',id),o.x+7,7,o.z); add(bx(1.6,1,.06),TM('#ffd60a',id),o.x+7.85,8.4,o.z);
+  [B.mir1,B.mir2,B.mir3].forEach((m,i)=>{const g=new THREE.Group(); g.position.set(m.x,0,m.z); g.rotation.y=[.5,-.4,.8][i]; scene.add(g);
+    add(bx(2.3,3.6,.3),TM('#8d6e63',id),0,1.9,0,g); add(bx(1.9,3.1,.06),TM('#bfe9ff',id),0,1.95,.17,g); add(bx(2.6,.3,1),TM('#8d6e63',id),0,.15,0,g);});
+  /* --- 2. feria --- */
+  id='feria'; o=B.stage;
+  flat(new THREE.CircleGeometry(27,40),TM('#f6e2b8',id),0,.11,-72);
+  add(bx(o.w,1,o.d),TM('#b5651d',id),o.x,.5,o.z); add(bx(o.w,4.2,.4),TM('#7b2d26',id),o.x,3.1,o.z-2.8); add(bx(o.w+1,.3,o.d+.8),TM('#f77f00',id),o.x,5.4,o.z);
+  [[-6.6,2.6],[6.6,2.6]].forEach(p=>add(cy(.14,.14,4.4,6),TM('#5a3d2b',id),o.x+p[0],3.2,o.z+p[1]));
+  for(let i=0;i<11;i++){const f=add(co(.38,.7,3),TM(SHIRTS[i%6],id),o.x-6.5+i*1.3,4.9,o.z+3.3); f.rotation.x=Math.PI;}
+  const harp=new THREE.Group(); harp.position.set(o.x+3,1,o.z); scene.add(harp);
+  add(bx(.18,2.6,.18),TM('#d4a017',id),0,1.3,0,harp); const hb=add(bx(.18,2.4,.5),TM('#d4a017',id),.6,1.25,0,harp); hb.rotation.z=.5; add(bx(1.4,.16,.2),TM('#d4a017',id),.55,2.55,0,harp);
+  add(bx(1.3,.9,.9),TM('#f4f1de',id),o.x-3.4,1.45,o.z-.6); add(cy(.5,.5,.5,10),TM('#c8553d',id),o.x-1.4,1.25,o.z+.4);
+  [B.tent1,B.tent2,B.tent3].forEach((t,i)=>{const c=[SHIRTS[0],SHIRTS[2],SHIRTS[3]][i]; [[-1.5,-1.5],[1.5,-1.5],[-1.5,1.5],[1.5,1.5]].forEach(p=>add(cy(.08,.08,2.6,5),TM('#5a3d2b',id),t.x+p[0],1.3,t.z+p[1]));
+    const r=add(co(2.9,1.6,4),TM(c,id),t.x,3.4,t.z); r.rotation.y=Math.PI/4; add(bx(2.2,.9,1.2),TM('#e9c46a',id),t.x,.45,t.z);
+    [-.6,0,.6].forEach((x,k)=>add(sp(.2,6,5),TM(['#ffd60a','#f4f1de','#c8553d'][k],id),t.x+x,1.05,t.z));});
+  /* --- 3. caño --- */
+  id='cano';
+  flat(new THREE.CircleGeometry(27,40),TM('#a9dc8c',id),62,.11,-36);
+  o=B.river; add(bx(o.w,.1,o.d),TM('#35a7e0',id),o.x,.14,o.z); add(bx(1.2,.12,o.d),TM('#d8c79a',id),o.x-3.4,.16,o.z);
+  for(let i=0;i<7;i++){const m=flat(new THREE.CircleGeometry(.9+(i%3)*.4,10),new THREE.MeshBasicMaterial({color:0x2a2622,transparent:true,opacity:.75}),78+((i*37)%30)/10,.22,-66+i*9.5); gone.push({d:id,obj:m});}
+  [[73.6,-52,'#ef476f'],[74.2,-47,'#f4f1de'],[73.4,-41,'#118ab2'],[74.4,-36,'#ffd60a'],[73.8,-27,'#f4f1de'],[74.3,-20,'#ef476f'],[72.9,-33,'#7b5cd6']].forEach(t=>{const m=add(bx(.42,.3,.34),CM(t[2]),t[0],.2,t[1]); m.rotation.y=t[1]; gone.push({d:id,obj:m});});
+  o=B.forest; for(let i=0;i<26;i++){const x=o.x-5+((i*7.3)%11),z=o.z-33+i*2.6,s=1+((i*13)%7)/10,g=new THREE.Group(); g.position.set(x,0,z); g.scale.setScalar(s); scene.add(g); add(trG,TM('#7a5230',id),0,.8,0,g); add(icG,TM(i%2?'#2f8f5b':'#3f9d54',id),0,2.6,0,g);}
+  o=B.shed; add(bx(o.w,3.4,o.d),TM('#aab4bf',id),o.x,1.7,o.z); const sr=add(bx(o.w+1,.3,o.d+1),TM('#6c757d',id),o.x,3.7,o.z); sr.rotation.z=.08; add(bx(3,2.4,.12),TM('#3d405b',id),o.x-1,1.2,o.z+o.d/2+.05);
+  [[0,0,'#d1495b'],[.9,.5,'#2d3142'],[-.2,.9,'#edae49']].forEach(b=>add(cy(.42,.42,1.1,10),TM(b[2],id),B.barrels.x+b[0]-.3,.55,B.barrels.z+b[1]-.4));
+  /* --- 4. memoria --- */
+  id='memoria'; o=B.station;
+  flat(new THREE.CircleGeometry(27,40),TM('#dccfb6',id),62,.11,36);
+  add(bx(o.w,4.5,o.d),TM('#f4e3c1',id),o.x,2.25,o.z); add(bx(o.w+1.6,.5,o.d+1.6),TM('#8c3b2a',id),o.x,4.75,o.z);
+  add(bx(3,8.4,3),TM('#f4e3c1',id),o.x,4.2,o.z); const tr=add(roofGeo,TM('#8c3b2a',id),o.x,9.4,o.z); tr.scale.set(3.8,2,3.8);
+  add(new THREE.CircleGeometry(.95,20),new THREE.MeshBasicMaterial({color:0xffffff}),o.x,6.8,o.z+1.52); add(bx(.08,.7,.04),CM('#1b1b1f'),o.x,7.1,o.z+1.55); add(bx(.5,.08,.04),CM('#1b1b1f'),o.x+.22,6.8,o.z+1.55);
+  add(bx(1.8,2.6,.12),TM('#6b4226',id),o.x,1.3,o.z+o.d/2+.05); [-5,-2.8,2.8,5].forEach(x=>add(bx(1.4,1.5,.12),TM('#d7f1ff',id),o.x+x,2.6,o.z+o.d/2+.05));
+  const st=label('Estación de la Memoria','#f4e3c1','#1b2a4a',.8); st.position.set(o.x,5.9,o.z+4.6); scene.add(st);
+  add(bx(66,.14,.2),TM('#5b5f66',id),66,.3,48.2); add(bx(66,.14,.2),TM('#5b5f66',id),66,.3,49.8);
+  const tieG=bx(.45,.1,2.6); for(let x=34;x<=98;x+=2.4) add(tieG,TM('#6b4226',id),x,.18,49);
+  o=B.loco; const lg=new THREE.Group(); lg.position.set(o.x,0,o.z); scene.add(lg);
+  const boiler=add(cy(1.15,1.15,5,12),TM('#2b2d42',id),-1,2,0,lg); boiler.rotation.z=Math.PI/2; add(bx(2.8,3.2,2.8),TM('#9d0208',id),2.9,2.5,0,lg); add(bx(3.2,.25,3.1),TM('#2b2d42',id),2.9,4.2,0,lg);
+  add(cy(.3,.4,1.3,8),TM('#2b2d42',id),-2.6,3.6,0,lg); add(bx(8.6,.5,2.4),TM('#3d405b',id),.2,.85,0,lg); add(co(1.1,1.4,4),TM('#edae49',id),-4.4,.9,0,lg).rotation.z=Math.PI/2;
+  [-3,-1,1,3].forEach(x=>[-1.25,1.25].forEach(z=>{const w=add(cy(.6,.6,.2,12),TM('#1b1b1f',id),x,.6,z,lg); w.rotation.x=Math.PI/2;}));
+  [B.ban1,B.ban2,B.ban3].forEach(b=>{const g=new THREE.Group(); g.position.set(b.x,0,b.z); scene.add(g); add(cy(.2,.28,2.6,6),TM('#8a9a5b',id),0,1.3,0,g);
+    for(let i=0;i<6;i++){const lf=add(bx(.6,.06,2.4),TM(i%2?'#4caf50':'#2f8f5b',id),0,2.8,0,g); lf.rotation.y=i*1.05; lf.rotation.x=.5; lf.translateZ(1.1);} add(sp(.34,6,5),TM('#ffd60a',id),.3,2.2,.2,g);});
+  /* --- 5. avenida --- */
+  id='avenida';
+  flat(new THREE.CircleGeometry(27,40),TM('#d3d6da',id),0,.11,72);
+  add(bx(88,.08,8),TM('#5c6068',id),0,.15,78); add(bx(88,.09,1.8),TM('#3d8fb3',id),0,.15,83.8);
+  for(let x=-42;x<=42;x+=4){ if(Math.abs(x)<3) continue; add(bx(1.8,.1,.18),CM('#f4f1de'),x,.18,78); }
+  for(let i=0;i<7;i++) add(bx(3.4,.1,.62),CM('#ffffff'),0,.18,74.7+i*1.1);
+  o=B.school2; add(bx(o.w,4.5,o.d),TM('#bde0fe',id),o.x,2.25,o.z); add(bx(o.w+1,.5,o.d+1),TM('#3d5a80',id),o.x,4.75,o.z); add(bx(2,2.5,.12),TM('#6b4226',id),o.x,1.25,o.z+o.d/2+.05);
+  [-4,4].forEach(x=>add(bx(1.6,1.4,.12),TM('#ffffff',id),o.x+x,2.7,o.z+o.d/2+.05));
+  const sc=label('Colegio','#bde0fe','#1b2a4a',.8); sc.position.set(o.x,5.8,o.z+3.2); scene.add(sc);
+  o=B.shelter; add(bx(o.w,2.4,.15),TM('#8ecae6',id),o.x,1.5,o.z-.6); add(bx(o.w+.4,.15,1.9),TM('#3d5a80',id),o.x,2.75,o.z); add(bx(o.w-1,.2,.6),TM('#6b4226',id),o.x,.6,o.z-.1);
+  o=B.stand; add(bx(o.w,1.1,o.d),TM('#f77f00',id),o.x,.55,o.z); add(cy(.06,.06,2.2,5),TM('#5a3d2b',id),o.x,2,o.z); add(co(2,.9,8),TM('#ef476f',id),o.x,3.3,o.z);
+  [-.8,0,.8].forEach((x,k)=>add(cy(.2,.16,.5,8),TM(['#ffd60a','#f77f00','#c8553d'][k],id),o.x+x,1.35,o.z+.4));
+  [[B.sgn1,'school'],[B.sgn2,'pare'],[B.sgn3,'bus']].forEach(a=>{add(cy(.07,.07,3,6),CM('#6c757d'),a[0].x,1.5,a[0].z); const p=add(new THREE.PlaneGeometry(1.7,1.7),new THREE.MeshBasicMaterial({map:signTex(a[1]),transparent:true,side:THREE.DoubleSide}),a[0].x,3.3,a[0].z+.05);});
+  [[76.5,1,'#e5484d'],[79.6,-1,'#118ab2']].forEach((c,i)=>{const g=new THREE.Group(); g.position.set(i?30:-30,0,c[0]); scene.add(g);
+    add(bx(3.8,.9,1.8),CM(c[2]),0,.8,0,g); add(bx(2,.8,1.6),CM('#d7f1ff'),-.1*c[1],1.6,0,g); [[-1.2,-.9],[1.2,-.9],[-1.2,.9],[1.2,.9]].forEach(w=>{add(cy(.36,.36,.2,10),CM('#1b1b1f'),w[0],.36,w[1],g).rotation.x=Math.PI/2;});
+    cars.push({g,dir:c[1],v:9});});
+  /* --- 6. parque --- */
+  id='parque';
+  flat(new THREE.CircleGeometry(27,40),TM('#9fe07c',id),-62,.11,36);
+  o=B.fountain; add(cy(3,3.2,.7,18),TM('#cfd8dc',id),o.x,.35,o.z); add(cy(2.6,2.6,.1,18),TM('#5cc8ff',id),o.x,.72,o.z); add(cy(.3,.45,1.8,8),TM('#cfd8dc',id),o.x,1.2,o.z); add(sp(.5,10,8),TM('#5cc8ff',id),o.x,2.3,o.z);
+  o=B.kiosk; add(cy(3.6,3.8,.4,8),TM('#e9d8a6',id),o.x,.2,o.z); for(let i=0;i<8;i++){const a=i/8*6.283; add(cy(.1,.1,3,5),TM('#ffffff',id),o.x+Math.cos(a)*3.2,1.9,o.z+Math.sin(a)*3.2);} add(co(4.4,2,8),TM('#7b5cd6',id),o.x,4.4,o.z);
+  [B.bench1,B.bench2].forEach(b=>{add(bx(2.4,.15,.7),TM('#b5651d',id),b.x,.6,b.z); add(bx(2.4,.6,.12),TM('#b5651d',id),b.x,1,b.z-.3); [-1,1].forEach(x=>add(bx(.14,.6,.6),TM('#3d405b',id),b.x+x,.3,b.z));});
+  o=B.swing; [-1.5,1.5].forEach(x=>{const a=add(cy(.08,.08,3.4,5),TM('#e5484d',id),o.x+x,1.6,o.z);}); add(bx(3.3,.14,.14),TM('#e5484d',id),o.x,3.3,o.z); [-.6,.6].forEach(x=>{add(bx(.04,2.2,.04),CM('#444444'),o.x+x-.25,2.2,o.z); add(bx(.04,2.2,.04),CM('#444444'),o.x+x+.25,2.2,o.z); add(bx(.6,.08,.3),TM('#ffd60a',id),o.x+x,1.1,o.z);});
+  for(let r=0;r<3;r++){ add(bx(5,.12,.9),TM('#7a5230',id),-43,.17,38+r*1.6); for(let k=0;k<6;k++) add(co(.18,.5,5),TM('#4caf50',id),-45+k*.8,.4,38+r*1.6); }
+  for(let i=0;i<18;i++){const a=i/18*6.283; add(sp(.28,6,5),TM(SHIRTS[i%6],id),-62+Math.cos(a)*24.5,.3,36+Math.sin(a)*24.5);}
+
+  /* --- decoración: jardineras, banderines, flores y pasto --- */
+  const POSTS=[],TUL=[],GRS=[];
+  [[14,0],[7,12.1],[-7,12.1],[-14,0],[-7,-12.1],[7,-12.1]].forEach((b,bi)=>{
+    flat(new THREE.CircleGeometry(1.7,12),TM('#8d6248'),b[0],.13,b[1]);
+    for(let k=0;k<9;k++){const a=k/9*6.283; POSTS.push({x:b[0]+Math.cos(a)*1.8,z:b[1]+Math.sin(a)*1.8});}
+    for(let k=0;k<7;k++){const a=k*2.4+bi; TUL.push({x:b[0]+Math.cos(a)*(.35+(k%3)*.42),z:b[1]+Math.sin(a)*(.35+(k%3)*.42),c:(k+bi)%4});}
+    L.col.push({x:b[0],z:b[1],r:2});});
+  let s2=13; const r2=()=>(s2=s2*16807%2147483647)/2147483647;
+  const open=(x,z)=>{ if(Math.hypot(x,z)<21) return false; if(Math.abs(z-78)<9&&Math.abs(x)<46) return false; if(x>68&&z<4&&z>-80) return false;
+    for(const s of ROADS) if(distSeg(x,z,s)<4) return false;
+    for(const h of L.houses) if(Math.abs(x-h.x)<h.w/2+1&&Math.abs(z-h.z)<h.d/2+1) return false; return true;};
+  for(let i=0;i<1400&&TUL.length<250;i++){const x=(r2()-.5)*196,z=(r2()-.5)*196; if(open(x,z)) TUL.push({x,z,c:i%4});}
+  for(let i=0;i<1800&&GRS.length<340;i++){const x=(r2()-.5)*196,z=(r2()-.5)*196; if(open(x,z)) GRS.push({x,z});}
+  const inst=(geo,mat,arr,y)=>{ if(!arr.length) return; const im=new THREE.InstancedMesh(geo,mat,arr.length);
+    const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),V=new THREE.Vector3(),U=new THREE.Vector3(1,1,1);
+    arr.forEach((w,i)=>{E.set(0,w.ry||0,0); Q.setFromEuler(E); M.compose(V.set(w.x,w.y!==undefined?w.y:y,w.z),Q,U); im.setMatrixAt(i,M);});
+    scene.add(im); return im;};
+  inst(bx(1.06,.96,.07),TM('#fbfbf4'),WIN,0);
+  inst(bx(.9,.8,.12),TM('#cfe6f2'),WIN,0);
+  inst(bx(.12,.55,.12),TM('#fdfdf8'),POSTS,.27);
+  inst(cy(.028,.028,.5,4),TM('#3b9b57'),TUL,.25);
+  ['#ef476f','#ffd166','#ff8fab','#8f7bd8'].forEach((cc,ci)=>inst(sp(.14,6,5),TM(cc),TUL.filter(t=>t.c===ci),.52));
+  inst(co(.17,.5,5),TM('#5fae52'),GRS,.25);
+  for(let k=0;k<13;k++){const t=(k+.5)/13; const f=add(new THREE.PlaneGeometry(.55,.42),TMd(['#ef476f','#ffd166','#06a77d','#118ab2'][k%4]),-8+16*t,3.95-Math.sin(t*Math.PI)*.95,8); f.rotation.y=.2*(k%2?1:-1); f.rotation.z=.06;}
+}
+function signTex(kind){
+  const c=document.createElement('canvas'),x=c.getContext('2d'); c.width=c.height=128;
+  if(kind==='school'){ x.translate(64,64); x.rotate(Math.PI/4); x.fillStyle='#1b1b1f'; x.fillRect(-44,-44,88,88); x.fillStyle='#ffd60a'; x.fillRect(-38,-38,76,76); x.rotate(-Math.PI/4); x.fillStyle='#1b1b1f';
+    [[-12,0,1],[12,6,.8]].forEach(p=>{x.beginPath(); x.arc(p[0],-14*p[2]+p[1],7*p[2],0,7); x.fill(); x.fillRect(p[0]-5*p[2],-6*p[2]+p[1],10*p[2],22*p[2]);}); }
+  if(kind==='pare'){ x.translate(64,64); x.fillStyle='#ffffff'; poly(x,8,58); x.fillStyle='#d62828'; poly(x,8,52); x.fillStyle='#ffffff'; x.font='800 30px Arial, sans-serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('PARE',0,2); }
+  if(kind==='bus'){ x.fillStyle='#ffffff'; x.fillRect(14,14,100,100); x.fillStyle='#1565c0'; x.fillRect(20,20,88,88); x.fillStyle='#ffffff'; x.fillRect(36,42,56,34); x.fillStyle='#1565c0'; x.fillRect(42,48,18,12); x.fillRect(68,48,18,12); x.fillStyle='#ffffff'; x.beginPath(); x.arc(48,82,7,0,7); x.arc(80,82,7,0,7); x.fill(); }
+  return new THREE.CanvasTexture(c);
+}
+function poly(x,n,r){x.beginPath(); for(let i=0;i<n;i++){const a=(i+.5)/n*Math.PI*2; x[i?'lineTo':'moveTo'](Math.cos(a)*r,Math.sin(a)*r);} x.closePath(); x.fill();}
+
+/* ---------- actores ---------- */
+const clouds=[], cars=[], wedges={}, actors=[];
+const P={x:S.pos[0],z:S.pos[1],rot:0,t:0};
+let player=null, chigui=null;
+function buildPlayer(){ if(player) scene.remove(player); player=person(Object.assign({acc:'pack'},S.look)); player.scale.setScalar(.92); player.position.set(P.x,0,P.z); player.rotation.y=P.rot; scene.add(player); }
+function buildActors(){
+  [CEIBA].concat(NPCS).forEach(n=>{const g=person(n.look); g.scale.setScalar(n.look.kid?.84:1); g.position.set(n.x,0,n.z); scene.add(g);
+    const lb=label(n.name,'rgba(27,42,74,.88)','#ffffff',.62); lb.position.set(0,3.05,0); g.add(lb);
+    const mk=new THREE.Sprite(MK.go); mk.scale.set(.95,.95,1); mk.position.set(0,3.95,0); g.add(mk);
+    lb.scale.multiplyScalar(1/g.scale.x); mk.scale.multiplyScalar(1/g.scale.x);
+    actors.push({n,g,mk,ph:Math.random()*6});});
+  chigui=capybara(); chigui.position.set(P.x-1.4,0,P.z+1); scene.add(chigui);
+}
+function npcState(n){
+  if(n.id==='ceiba') return (!S.intro||(allDone()&&!S.final))?'go':'none';
+  if(n.role==='guide') return S.guides[n.d]?'none':'go';
+  if(S.solved[n.id]) return 'ok';
+  return S.guides[n.d]?'go':'lock';
+}
+const allDone=()=>DISTRICTS.every(d=>S.done[d.id]);
+function refresh(){
+  actors.forEach(a=>{const s=npcState(a.n); a.mk.visible=s!=='none'; if(s!=='none') a.mk.material=MK[s];});
+  DISTRICTS.forEach(d=>{const r=retosOf(d.id),k=r.filter(n=>S.solved[n.id]).length; TG[d.id].t=S.done[d.id]?1:(S.guides[d.id]?.12:0)+.6*k/r.length; wedges[d.id].color.set(S.done[d.id]?d.tint:'#aab0ba');});
+  TG.all.t=DISTRICTS.filter(d=>S.done[d.id]).length/6;
+  gone.forEach(o=>o.obj.visible=!S.done[o.d]);
+  $('#chipName').textContent=S.name; $('#chipStars').textContent='★ '+stars()+' / '+MAXSTARS;
+  const p=$('#pips'); p.textContent=''; DISTRICTS.forEach(d=>{const i=el('i'); if(S.done[d.id]) i.style.background=d.tint; p.appendChild(i);});
+  $('#btnSnd').textContent=S.mute?'Sin sonido':'Con sonido';
+}
+
+/* ---------- entrada ---------- */
+const keys={}; const joy={x:0,y:0};
+let mode='title';
+const MAPK={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowUp:'u',w:'u',W:'u',ArrowDown:'d',s:'d',S:'d'};
+addEventListener('keydown',e=>{
+  const typing=/INPUT|TEXTAREA/.test((e.target&&e.target.tagName)||''); if(typing) return;
+  if(MAPK[e.key]){keys[MAPK[e.key]]=1; if(mode==='play') e.preventDefault();}
+  if(e.key==='e'||e.key==='E'||e.key===' '||e.key==='Enter'){ if(e.repeat) return; if(mode==='dialog'){e.preventDefault(); advance();} else if(mode==='play'&&near&&performance.now()>talkLock){e.preventDefault(); talk(near);} }
+});
+addEventListener('keyup',e=>{ if(MAPK[e.key]) keys[MAPK[e.key]]=0; });
+addEventListener('blur',()=>{for(const k in keys) keys[k]=0;});
+(function(){const st=$('#stick'),kn=$('#knob'); let pid=null;
+  const mv=e=>{const r=st.getBoundingClientRect(); let dx=(e.clientX-r.left-r.width/2)/(r.width/2), dy=(e.clientY-r.top-r.height/2)/(r.height/2); const l=Math.hypot(dx,dy); if(l>1){dx/=l;dy/=l;} joy.x=dx; joy.y=dy; kn.style.transform='translate('+dx*36+'px,'+dy*36+'px)';};
+  st.addEventListener('pointerdown',e=>{pid=e.pointerId; try{st.setPointerCapture(pid);}catch(_){} mv(e); e.preventDefault();});
+  st.addEventListener('pointermove',e=>{ if(e.pointerId===pid) mv(e); });
+  const up=e=>{ if(e.pointerId===pid){pid=null; joy.x=joy.y=0; kn.style.transform='';} };
+  st.addEventListener('pointerup',up); st.addEventListener('pointercancel',up);
+})();
+
+function blocked(x,z){
+  if(Math.abs(x)>102||Math.abs(z)>102) return true; const R=.55;
+  for(let i=0;i<L.col.length;i++){const c=L.col[i]; if(c.r!==undefined){const dx=x-c.x,dz=z-c.z,rr=c.r+R; if(dx*dx+dz*dz<rr*rr) return true;} else if(x>c.x0-R&&x<c.x1+R&&z>c.z0-R&&z<c.z1+R) return true;}
+  return false;
+}
+
+/* ---------- diálogo ---------- */
+let dlg=null, typer=null, near=null, talkLock=0;
+function say(lines,who,cb){ dlg={lines:lines.map(l=>typeof l==='string'?{s:who,t:l}:l),i:0,cb}; mode='dialog'; ui(); $('#dialog').hidden=false; showLine(); }
+function showLine(){ const l=dlg.lines[dlg.i], full=fmt(l.t), box=$('#dlgTxt'); $('#dlgWho').textContent=l.s; $('#dlgNext').textContent=dlg.i<dlg.lines.length-1?'Siguiente':'Listo';
+  clearInterval(typer); typer=null; if(reduce){box.textContent=full; return;}
+  let k=0; box.textContent=''; typer=setInterval(()=>{k+=2; box.textContent=full.slice(0,k); if(k>=full.length){clearInterval(typer); typer=null;}},22); dlg.full=full; }
+function advance(){ if(!dlg) return; sfx.tap();
+  if(typer){clearInterval(typer); typer=null; $('#dlgTxt').textContent=dlg.full; return;}
+  dlg.i++; if(dlg.i<dlg.lines.length){showLine(); return;}
+  const cb=dlg.cb; dlg=null; $('#dialog').hidden=true; mode='play'; talkLock=performance.now()+650; ui(); if(cb) cb(); }
+$('#dialog').addEventListener('click',advance);
+
+function toast(t){const e=$('#toast'); e.textContent=t; e.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>e.hidden=true,3200);}
+function banner(t){const e=$('#banner'); $('#banTxt').textContent=t; e.hidden=false; clearTimeout(banner.h); banner.h=setTimeout(()=>e.hidden=true,4200);}
+let zone=null;
+function zoneAt(){ if(Math.hypot(P.x,P.z)<19) return 'Plaza del Gran Mosaico'; const d=DISTRICTS.find(q=>Math.hypot(P.x-q.cx,P.z-q.cz)<27); return d?d.name:null; }
+function showZone(t){ const b=$('#locBand'); $('#locTxt').textContent=t; b.classList.add('show'); clearTimeout(showZone.h); showZone.h=setTimeout(()=>b.classList.remove('show'),2600); }
+
+/* ---------- conversación con personajes ---------- */
+function talk(a){
+  const n=a.n; sfx.tap();
+  if(n.id==='ceiba'){
+    if(!S.intro) return say(INTRO,n.name,()=>{S.intro=true; refresh(); save();});
+    if(S.final) return say(['Villa Mosaico brilla gracias a ti, {n}. Puedes seguir paseando y repasando con los vecinos cuando quieras.'],n.name,()=>showCert());
+    if(allDone()) return say(FINAL_LINES,n.name,openOath);
+    const left=DISTRICTS.filter(d=>!S.done[d.id]).map(d=>d.name);
+    return say(['Llevas '+(6-left.length)+' de 6 teselas, {n}. Todavía hay niebla en: '+left.join(', ')+'.','Sigue la flecha amarilla y mira el mapa de la esquina. Si olvidas algo, abre tu Cuaderno.'],n.name);
+  }
+  const D=DISTRICTS.find(d=>d.id===n.d);
+  if(n.role==='guide'){
+    const first=!S.guides[n.d];
+    return say(first?n.lesson:['¿Repasamos? Escucha de nuevo con atención.'].concat(n.lesson.slice(1)),n.name,()=>{ if(first){S.guides[n.d]=true; refresh(); save(); toast('Nuevo en tu Cuaderno: '+D.tema);} });
+  }
+  if(!S.guides[n.d]) return say(['Hola. Aquí pasan cosas raras desde que llegó la niebla. Primero habla con '+guideOf(n.d).name+', que te explicará todo.'],n.name);
+  if(S.solved[n.id]) return say([n.after],n.name);
+  say(n.intro,n.name,()=>openChallenge(n));
+}
+function solved(n,st){
+  S.solved[n.id]=st; const D=DISTRICTS.find(d=>d.id===n.d), all=retosOf(n.d).every(r=>S.solved[r.id]);
+  if(all) S.done[n.d]=true; refresh(); save();
+  const lines=[n.after];
+  if(all) lines.push({s:'Chigüi',t:DONE_LINES[n.d]});
+  say(lines,n.name,()=>{ if(all){ sfx.win(); banner(D.name+' recuperó su color'); if(allDone()) setTimeout(()=>toast('¡Tienes las seis teselas! Vuelve a la plaza con Doña Ceiba.'),4300); } });
+}
+
+/* ---------- retos ---------- */
+function shuffle(a){a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;}
+function openChallenge(n){
+  const c=n.ch, card=$('#chCard'), D=DISTRICTS.find(d=>d.id===n.d); let tries=0;
+  mode='panel'; ui(); card.textContent=''; $('#vCh').hidden=false; card.scrollTop=0;
+  card.appendChild(el('p','eyebrow',D.name+' · '+n.name));
+  if(c.ctx) card.appendChild(el('div','ctx',c.ctx));
+  card.appendChild(el('h2','q',c.q));
+  const body=el('div'); card.appendChild(body);
+  const fb=el('div','fb'); fb.hidden=true; card.appendChild(fb);
+  const row=el('div','row'); card.appendChild(row);
+  const leave=el('button','btn alt','Volver después'); leave.onclick=()=>{$('#vCh').hidden=true; mode='play'; ui();}; row.appendChild(leave);
+  const hint=t=>{fb.className='fb hint'; fb.textContent='Pista: '+t; fb.hidden=false; sfx.bad(); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');};
+  const win=()=>{ const st=tries===0?3:tries<=(c.type==='classify'?2:1)?2:1; sfx.ok();
+    fb.className='fb good'; fb.textContent='¡Correcto! '+c.why; fb.hidden=false; row.textContent='';
+    row.appendChild(el('span','stars','★'.repeat(st)+'☆'.repeat(3-st)));
+    const go=el('button','btn','Continuar'); go.onclick=()=>{$('#vCh').hidden=true; mode='play'; solved(n,st);}; row.appendChild(go); go.focus(); fb.scrollIntoView({block:'nearest'}); };
+  if(c.type==='quiz'){
+    const box=el('div','opts'); body.appendChild(box);
+    shuffle(c.opts.map((t,i)=>i)).forEach((oi,k)=>{const b=el('button','opt'); b.appendChild(el('b',null,'ABCD'[k])); b.appendChild(el('span',null,c.opts[oi]));
+      b.onclick=()=>{ if(oi===0){ b.classList.add('ok'); box.querySelectorAll('button').forEach(x=>x.disabled=true); win(); } else { b.classList.add('no'); b.disabled=true; tries++; hint(c.hint); } };
+      box.appendChild(b);});
+  }
+  if(c.type==='order'){
+    const slots=el('div','slots'), box=el('div','opts'); body.appendChild(slots); body.appendChild(box); let seq=[];
+    const draw=()=>{ slots.textContent=''; c.items.forEach((_,i)=>{const s=el('div','slot'+(seq[i]!=null?' full':'')); s.appendChild(el('b',null,(i+1)+'.º')); s.appendChild(el('span',null,seq[i]!=null?c.items[seq[i]]:'Toca una pieza')); slots.appendChild(s);});
+      box.querySelectorAll('button').forEach(b=>b.disabled=seq.indexOf(+b.dataset.i)>=0); };
+    shuffle(c.items.map((t,i)=>i)).forEach(oi=>{const b=el('button','opt'); b.dataset.i=oi; b.appendChild(el('span',null,c.items[oi]));
+      b.onclick=()=>{ sfx.tap(); seq.push(oi); draw(); if(seq.length===c.items.length){ if(seq.every((v,i)=>v===i)){ win(); } else { tries++; hint(c.hint); setTimeout(()=>{seq=[]; draw();},900); } } };
+      box.appendChild(b);});
+    draw();
+  }
+  if(c.type==='classify'){
+    const items=shuffle(c.items); let i=0;
+    const pr=el('div','prog'), bar=el('i'); pr.appendChild(bar); body.appendChild(pr);
+    const cnt=el('p','eyebrow'); cnt.style.marginTop='10px'; body.appendChild(cnt);
+    const it=el('div','item'); body.appendChild(it);
+    const cats=el('div','cats'); body.appendChild(cats);
+    const draw=()=>{ bar.style.width=(i/items.length*100)+'%'; if(i>=items.length){ it.hidden=cats.hidden=cnt.hidden=true; win(); return; } cnt.textContent='Tarjeta '+(i+1)+' de '+items.length; it.textContent=items[i][0]; };
+    c.cats.forEach((t,ci)=>{const b=el('button','opt',t); b.onclick=()=>{ if(items[i][1]===ci){ sfx.tap(); fb.hidden=true; i++; draw(); } else { tries++; hint('Esa tarjeta no va en «'+t+'». Léela otra vez con calma.'); } }; cats.appendChild(b);});
+    draw();
+  }
+}
+
+/* ---------- cuaderno ---------- */
+function openBook(){
+  const b=$('#bookBody'); b.textContent=''; $('#vBook h2').textContent='Cuaderno de '+S.name;
+  DISTRICTS.forEach((d,i)=>{const s=el('div','dsec'), h=el('h3'); const sw=el('i'); sw.style.background=S.done[d.id]?d.tint:'#c9ced8'; h.appendChild(sw); h.appendChild(el('span',null,(i+1)+'. '+d.name+' · '+d.tema)); s.appendChild(h);
+    if(!S.guides[d.id]) s.appendChild(el('p','dim','Aún no has hablado con '+guideOf(d.id).name+'.'));
+    else { const dl=el('dl'); guideOf(d.id).notes.concat(retosOf(d.id).filter(n=>S.solved[n.id]&&n.ch.note).map(n=>n.ch.note)).forEach(t=>{dl.appendChild(el('dt',null,t[0])); dl.appendChild(el('dd',null,t[1]));}); s.appendChild(dl);
+      const r=retosOf(d.id); s.appendChild(el('p','dim','Retos resueltos: '+r.filter(n=>S.solved[n.id]).length+' de '+r.length)); }
+    b.appendChild(s);});
+  mode='panel'; ui(); $('#vBook').hidden=false;
+}
+$('#btnBook').onclick=()=>{ if(mode==='play'){sfx.tap(); openBook();} };
+$('#bookClose').onclick=()=>{$('#vBook').hidden=true; mode='play'; ui();};
+$('#btnSnd').onclick=()=>{S.mute=!S.mute; refresh(); save(); sfx.tap();};
+
+/* ---------- juramento y diploma ---------- */
+const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function checkOath(){ const t=norm($('#oathTxt').value); let ok=true;
+  $('#oathChk').querySelectorAll('li').forEach(li=>{const k=li.dataset.k, y=k==='len'?t.replace(/\s+/g,' ').length>=220:t.indexOf(k)>=0; li.classList.toggle('y',y); if(!y) ok=false;});
+  $('#oathOk').disabled=!ok; }
+function openOath(){ mode='panel'; ui(); $('#oathTxt').value=S.oath||''; checkOath(); $('#vOath').hidden=false; }
+$('#oathTxt').addEventListener('input',checkOath);
+$('#oathBack').onclick=()=>{S.oath=$('#oathTxt').value; save(); $('#vOath').hidden=true; mode='play'; ui();};
+$('#oathOk').onclick=()=>{S.oath=$('#oathTxt').value.trim(); S.final=true; refresh(); save(); $('#vOath').hidden=true; sfx.win(); showCert();};
+function showCert(){
+  const st=stars(), pct=st/MAXSTARS, fem=S.g==='Guardiana';
+  $('#certName').textContent=S.name;
+  $('#certRank').textContent=pct>=.9?(fem?'Gran Guardiana del Mosaico':'Gran Guardián del Mosaico'):pct>=.7?S.g+' del Mosaico':'Aprendiz del Mosaico';
+  $('#certStats').textContent='★ '+st+' de '+MAXSTARS+' estrellas · 6 de 6 teselas · '+RETOS.length+' retos resueltos';
+  $('#certOath').textContent=S.oath; $('#certDate').textContent='Villa Mosaico, '+new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+  mode='panel'; ui(); $('#vCert').hidden=false;
+}
+$('#certClose').onclick=()=>{$('#vCert').hidden=true; mode='play'; ui();};
+
+/* ---------- título y creador ---------- */
+function swatches(host,list,get,set,asText){ host.textContent=''; list.forEach((v,i)=>{const b=el('button',asText?'txt':null,asText?v:null); if(!asText) b.style.background=v; b.type='button'; b.setAttribute('aria-label',asText?v:'Color '+(i+1));
+  const val=asText==='idx'?i:v; b.setAttribute('aria-pressed',String(get()===val)); b.onclick=()=>{set(val); sfx.tap(); host.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); buildPlayer();}; host.appendChild(b);}); }
+function openCreator(){
+  mode='creator'; $('#vTitle').hidden=true; $('#creator').hidden=false; P.x=0; P.z=7; P.rot=0; buildPlayer();
+  $('#inName').value=S.name;
+  swatches($('#swG'),['Guardián','Guardiana'],()=>S.g,v=>S.g=v,true);
+  swatches($('#swSkin'),SK,()=>S.look.skin,v=>S.look.skin=v);
+  swatches($('#swHair'),HR.slice(0,5),()=>S.look.hair,v=>S.look.hair=v);
+  swatches($('#swStyle'),STYLES,()=>S.look.style,v=>S.look.style=v,'idx');
+  swatches($('#swShirt'),SHIRTS,()=>S.look.shirt,v=>S.look.shirt=v);
+}
+$('#btnGo').onclick=()=>{ const nm=$('#inName').value.trim().replace(/[<>{}]/g,''); if(nm.length<2){ $('#crMsg').textContent='Escribe tu nombre para empezar.'; $('#inName').focus(); return; }
+  S.name=nm; $('#creator').hidden=true; sfx.ok(); startPlay(); };
+$('#btnStart').onclick=()=>{ sfx.tap(); if(hadSave&&S.name){ $('#vTitle').hidden=true; buildPlayer(); startPlay(); } else openCreator(); };
+let resetArmed=false;
+$('#btnReset').onclick=()=>{ if(!resetArmed){resetArmed=true; $('#btnReset').textContent='Toca otra vez para borrar tu avance'; return;} try{localStorage.removeItem(KEY);}catch(e){} S=fresh(); P.x=0; P.z=7; refresh(); openCreator(); };
+function startPlay(){ mode='play'; refresh(); save(); ui(); if(!S.intro) setTimeout(()=>{ if(mode==='play') talk(actors[0]); },700); }
+function ui(){ const p=mode==='play', g=mode!=='title'&&mode!=='creator'; if(!p) $('#locBand').classList.remove('show');
+  $('#hud').hidden=!g; $('#goal').hidden=!p; $('#mini').hidden=!g||mode==='panel'; $('#stick').hidden=!p; $('#keys').hidden=!p||!!S.intro&&Object.keys(S.guides).length>0; if(!p) $('#btnAct').hidden=true; }
+$('#btnAct').onclick=()=>{ $('#btnAct').blur(); if(mode==='play'&&near) talk(near); };
+
+/* ---------- objetivo y minimapa ---------- */
+function target(){
+  if(!S.intro) return {a:actors[0],t:'Habla con Doña Ceiba'};
+  let order=DISTRICTS.slice(); const here=DISTRICTS.find(d=>Math.hypot(P.x-d.cx,P.z-d.cz)<30&&!S.done[d.id]);
+  if(here) order=[here].concat(order.filter(d=>d!==here));
+  for(const d of order){ if(S.done[d.id]) continue;
+    if(!S.guides[d.id]){const n=guideOf(d.id); return {a:actors.find(a=>a.n===n),t:'Ve al '+artic(d.name)+' y habla con '+n.name};}
+    const n=retosOf(d.id).find(r=>!S.solved[r.id]); return {a:actors.find(a=>a.n===n),t:'Ayuda a '+n.name}; }
+  if(!S.final) return {a:actors[0],t:'Vuelve a la plaza y habla con Doña Ceiba'};
+  return null;
+}
+const artic=n=>n.replace(/^(Plaza|Vereda|Estación|Avenida)/,m=>'#'+m).replace(/^#/,'').replace(/^(Barrio|Parque)/,'$1');
+function goalText(d){ return /^(Plaza|Vereda|Estación|Avenida)/.test(d)?'Ve a la '+d:'Ve al '+d; }
+const mini=$('#mini'), mx=mini.getContext('2d'); let miniT=0, tgt=null;
+function drawMini(){
+  const W=240,k=W/220,c=v=>(v+110)*k; mx.clearRect(0,0,W,W); mx.fillStyle='#e7edf7'; mx.fillRect(0,0,W,W);
+  mx.strokeStyle='#b9c1d1'; mx.lineWidth=5; ROADS.forEach(s=>{mx.beginPath(); mx.moveTo(c(s[0]),c(s[1])); mx.lineTo(c(s[2]),c(s[3])); mx.stroke();});
+  mx.fillStyle='#fff'; mx.strokeStyle='#1b2a4a'; mx.lineWidth=3; mx.beginPath(); mx.arc(c(0),c(0),12,0,7); mx.fill(); mx.stroke();
+  DISTRICTS.forEach((d,i)=>{mx.beginPath(); mx.arc(c(d.cx),c(d.cz),19,0,7); mx.fillStyle=S.done[d.id]?d.tint:'#c9ced8'; mx.fill(); mx.stroke(); mx.fillStyle='#1b2a4a'; mx.font='800 22px Arial, sans-serif'; mx.textAlign='center'; mx.textBaseline='middle'; mx.fillText(i+1,c(d.cx),c(d.cz)+1);});
+  if(tgt){mx.strokeStyle='#ffb703'; mx.lineWidth=5; mx.beginPath(); mx.arc(c(tgt.a.n.x),c(tgt.a.n.z),9+Math.sin(clock*5)*3,0,7); mx.stroke();}
+  mx.fillStyle='#e5484d'; mx.strokeStyle='#fff'; mx.lineWidth=3; mx.beginPath(); mx.arc(c(P.x),c(P.z),7,0,7); mx.fill(); mx.stroke();
+}
+
+/* ---------- bucle ---------- */
+let clock=0, last=performance.now(); const camPos=new THREE.Vector3(0,26,40), camLook=new THREE.Vector3(0,2,0), v3=new THREE.Vector3();
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize',resize);
+function lerpAng(a,b,t){let d=((b-a+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI; return a+d*t;}
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now; clock+=dt;
+  /* jugador */
+  let ix=0,iz=0; if(mode==='play'){ ix=(keys.r?1:0)-(keys.l?1:0)+joy.x; iz=(keys.d?1:0)-(keys.u?1:0)+joy.y; }
+  const len=Math.hypot(ix,iz); if(len>1){ix/=len;iz/=len;}
+  if(len>.12){ const sp2=10, nx=P.x+ix*sp2*dt, nz=P.z+iz*sp2*dt; if(!blocked(nx,P.z)) P.x=nx; if(!blocked(P.x,nz)) P.z=nz; P.rot=lerpAng(P.rot,Math.atan2(ix,iz),Math.min(1,dt*12)); P.t+=dt*11; }
+  if(player){ player.position.set(P.x,len>.12?Math.abs(Math.sin(P.t))*.08:0,P.z); player.rotation.y=mode==='creator'?Math.sin(clock*.8)*.5:P.rot; swing(player,P.t,len>.12?.75:0); }
+  /* chigüi */
+  if(chigui){ const tx=P.x-Math.sin(P.rot)*1.7+.6, tz=P.z-Math.cos(P.rot)*1.7, dx=tx-chigui.position.x, dz=tz-chigui.position.z, d=Math.hypot(dx,dz);
+    if(d>.35){ const f=Math.min(1,dt*(d>12?30:4.5)); chigui.position.x+=dx*f; chigui.position.z+=dz*f; chigui.rotation.y=lerpAng(chigui.rotation.y,Math.atan2(dx,dz),Math.min(1,dt*10)); chigui.position.y=Math.abs(Math.sin(clock*12))*.12; } else chigui.position.y=0;
+    chigui.visible=mode!=='title'&&mode!=='creator'; }
+  /* vecinos */
+  near=null; let nd=3.4;
+  actors.forEach(a=>{const dx=P.x-a.n.x,dz=P.z-a.n.z,d=Math.hypot(dx,dz); if(d<nd){nd=d;near=a;}
+    a.g.rotation.y=lerpAng(a.g.rotation.y,d<9?Math.atan2(dx,dz):0,Math.min(1,dt*5)); a.g.userData.armL.rotation.z=Math.sin(clock*1.6+a.ph)*.06; a.g.userData.head.rotation.z=Math.sin(clock*1.1+a.ph)*.04; a.mk.position.y=3.95+Math.sin(clock*3+a.ph)*.12;});
+  if(mode==='play'){ const b=$('#btnAct'); if(near){ const t='Hablar con '+near.n.name; if(b.textContent!==t) b.textContent=t; b.hidden=false; } else b.hidden=true; }
+  /* carros */
+  cars.forEach(c=>{const g=c.g, ahead=(P.x-g.position.x)*c.dir, stop=Math.abs(P.z-g.position.z)<4.2&&ahead>-2.5&&ahead<9; c.v+=((stop?0:9)-c.v)*Math.min(1,dt*6); g.position.x+=c.dir*c.v*dt; if(g.position.x>44) g.position.x=-44; if(g.position.x<-44) g.position.x=44; g.rotation.y=c.dir>0?0:Math.PI;});
+  clouds.forEach(c=>{c.position.x+=dt*1.2; if(c.position.x>190) c.position.x=-190;});
+  /* color */
+  let tot=0; for(const k in TG){const G=TG[k]; if(Math.abs(G.t-G.f)>.001){G.f+=(G.t-G.f)*Math.min(1,dt*1.4); applyTint(G);} if(k!=='all') tot+=G.f;}
+  scene.background.copy(SKY_G).lerp(SKY_C,tot/6); scene.fog.color.copy(scene.background);
+  /* cámara */
+  const port=camera.aspect<.9?1.32:1;
+  if(mode==='title'){ v3.set(Math.sin(clock*.12)*46,24,Math.cos(clock*.12)*46); camPos.lerp(v3,1-Math.exp(-dt*3)); camLook.set(0,3,0); }
+  else if(mode==='creator'){ const wide=innerWidth>720; v3.set(P.x+(wide?1.9:0),2.3,P.z+(wide?6.2:8)); camPos.lerp(v3,1-Math.exp(-dt*7)); camLook.set(P.x+(wide?1.9:0),wide?1.25:-.2,P.z); }
+  else { v3.set(P.x,15.5*port,P.z+14.5*port); camPos.lerp(v3,1-Math.exp(-dt*7)); camLook.set(P.x,1.4,P.z-1.2); }
+  camera.position.copy(camPos); camera.lookAt(camLook);
+  /* objetivo */
+  if(mode==='play'){ miniT-=dt; if(miniT<=0){ miniT=.12; tgt=target(); const gt=$('#goalTxt'), ar=$('#goalArrow');
+      if(!tgt){ gt.textContent='¡Villa Mosaico está a salvo! Pasea libremente.'; ar.style.visibility='hidden'; }
+      else { const dx=tgt.a.n.x-P.x,dz=tgt.a.n.z-P.z,d=Math.hypot(dx,dz); const dd=DISTRICTS.find(q=>q.id===tgt.a.n.d);
+        let t=tgt.t; if(dd&&tgt.a.n.role==='guide') t=goalText(dd.name)+' y habla con '+tgt.a.n.name;
+        t+=d>6?' · '+Math.round(d)+' m':''; if(gt.textContent!==t) gt.textContent=t; ar.style.visibility='visible'; ar.style.transform='rotate('+Math.atan2(dx,-dz)+'rad)'; }
+      drawMini(); const zn=zoneAt(); if(zn!==zone){ zone=zn; if(zn) showZone(zn); } } }
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- arranque ---------- */
+function init(){
+  buildWorld(); buildActors(); buildPlayer(); player.visible=true;
+  if(blocked(P.x,P.z)){ P.x=0; P.z=7; }
+  for(const k in TG){ TG[k].f=-1; }
+  refresh(); for(const k in TG){ TG[k].f=TG[k].t; applyTint(TG[k]); }
+  if(hadSave){ $('#btnStart').textContent='Continuar como '+S.name; $('#btnReset').hidden=false; }
+  resize(); ui(); requestAnimationFrame(frame);
+  window.__mosaico={get S(){return S;},P,actors,talk,get mode(){return mode;}};
+}
+let started=false; const go=()=>{ if(!started){started=true; init();} };
+if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(go); setTimeout(go,1500); } else go();
+})();
+
+</script>
+</body>
+</html>
